@@ -1,185 +1,82 @@
-# 🔍 Инструкции по отладке WalletConnect
+# 🔍 WalletConnect Debug Instructions
 
-## ✅ Что было добавлено
+## ✅ What was added
 
-Добавлено **детальное логирование** для диагностики проблемы "Соединение было установлено через этот URL".
+Detailed logging was added to diagnose the wallet-side error “Connection was established via this URL”.
 
-### 📊 Новые логи
+### 📊 New logs
+You should now see logs for:
+1. **Connection creation** (proposal, topic, symKey, URI)
+2. **Wallet responses** (incoming messages)
+3. **Session creation** (session details)
+4. **Errors** (error code + message)
 
-Теперь вы увидите:
+## 🚀 How to test
 
-1. **При создании подключения:**
-   ```
-   [WalletConnect] Using REQUIRED namespaces (matching JS SDK)
-   [WalletConnect] Chains: ["qubic:mainnet"]
-   [WalletConnect] Methods: [...]
-   [WalletConnect] 📤 Subscribing to pairing topic: <topic>
-   [WalletConnect] 📤 Publishing SessionPropose to topic: <topic>
-   [WalletConnect] ✅ SessionPropose sent successfully!
-   [WalletConnect] 🔑 Pairing topic: <topic>
-   [WalletConnect] ⏰ Expiry: <timestamp>
-   ```
-
-2. **При получении ответа от кошелька:**
-   ```
-   [WalletConnect] 📨 Received message: SessionProposeResponse on topic <topic>
-   [WalletConnect] ✅ Received SessionProposeResponse from wallet!
-   [WalletConnect] ✅ Wallet approved! Creating derived topic: <topic>
-   ```
-
-3. **При установке сессии:**
-   ```
-   [WalletConnect] 🎉 SessionSettle received! Session is being established...
-   [WalletConnect] ✅ Session established successfully!
-   ```
-
-4. **При ошибках:**
-   ```
-   [WalletConnect] ❌ Received ERROR from wallet - code: <code>, message: '<message>'
-   [WalletConnect] This error message suggests: <diagnosis>
-   ```
-
-## 🚀 Как тестировать
-
-### 1. Запустите программу с логами
-
+### 1. Run with debug logs
 ```bash
-cd "D:\Work\MySelf\Qubic\SCAPI"
-cargo run 2>&1 | tee walletconnect_debug.log
+set RUST_LOG=debug
+cargo run
 ```
 
-Или просто:
+Or simply:
 ```bash
 cargo run
 ```
 
-Логи будут выводиться в консоль (DEBUG уровень включен).
+### 2. Scan the QR code
+- Open the Qubic wallet
+- Find WalletConnect
+- Scan the QR code
 
-### 2. Отсканируйте QR-код
+### 3. Watch the logs
+You should see a sequence like:
+- “SessionPropose sent successfully”
+- “Received message: ...”
+- “Session established”
 
-- Откройте Qubic кошелек
-- Найдите WalletConnect
-- Отсканируйте QR-код
+### 4. What to look for
 
-### 3. Наблюдайте за логами
+#### ✅ Successful connection
+- proposal is sent
+- wallet responds with approval
+- session becomes active
 
-Вы должны увидеть последовательность:
+#### ❌ Connection error
+If the wallet rejects, the error code/message should be logged.
 
-```
-[WalletConnect] ✅ SessionPropose sent successfully!
-[WalletConnect] 📨 Received message: ... on topic ...
-```
+#### ⏰ Timeout
+If no response arrives before the timeout, verify relay connectivity and wallet behavior.
 
-**ВАЖНО:** Если вы видите ошибку от кошелька, она будет отображаться как:
+## 📋 Diagnostics checklist
 
-```
-[WalletConnect] ❌ Received ERROR from wallet - code: <code>, message: '<message>'
-[WalletConnect] This error message suggests: Wallet sees an existing connection...
-```
+Check these items:
+- [ ] Was the proposal sent?
+- [ ] Did the wallet respond?
+- [ ] Which response type (approval vs error)?
+- [ ] Are the correct namespaces used (Qubic in `required_namespaces`)?
 
-### 4. Что искать в логах
+## 🔧 What to do if the error repeats
 
-#### ✅ Успешное подключение:
-```
-[WalletConnect] ✅ Received SessionProposeResponse from wallet!
-[WalletConnect] ✅ Wallet approved! Creating derived topic: ...
-[WalletConnect] 🎉 SessionSettle received!
-[WalletConnect] ✅ Session established successfully!
-```
+1. Copy the full error info from logs (code + message)
+2. Verify the URI topic changes on each run
+3. Compare with the JavaScript version flow (proposal payload, namespaces)
+4. Verify relay connectivity
 
-#### ❌ Ошибка "соединение уже установлено":
-```
-[WalletConnect] ❌ Received ERROR from wallet - code: <code>, message: 'Соединение было установлено через этот URL'
-[WalletConnect] This error message suggests: Wallet sees an existing connection...
-```
+## 📝 Sharing logs for analysis
 
-#### ⏰ Timeout (QR не отсканирован):
-```
-[WalletConnect] ⏰ Connection timeout - QR code not scanned
-```
+If the issue persists, provide:
+1. Full log output (or saved log file)
+2. The generated URI (redact secrets if needed)
+3. Time from “URI created” to rejection/timeout
+4. Wallet version (if known)
 
-## 📋 Чек-лист диагностики
+## 🎯 Expected result
 
-Проверьте следующие моменты в логах:
+With these logs you should be able to see:
+- exactly what is sent to the wallet
+- what the wallet replies with
+- where the flow fails
 
-- [ ] **SessionPropose отправлен?**
-  - Должна быть строка: `✅ SessionPropose sent successfully!`
-
-- [ ] **Кошелек ответил?**
-  - Должна быть строка: `📨 Received message: ...`
-  - Если нет - проблема в доставке сообщения через relay
-
-- [ ] **Какой тип ответа?**
-  - `SessionProposeResponse` = ✅ кошелек одобрил
-  - `Error` = ❌ кошелек отклонил
-  - Нет ответа = ⏰ timeout или проблема с relay
-
-- [ ] **Какая ошибка?**
-  - Если есть `Error` с сообщением об "установленном соединении" - кошелек видит старый pairing
-  - Проверьте код ошибки в логах
-
-- [ ] **Используются правильные namespaces?**
-  - Должна быть строка: `Using REQUIRED namespaces (matching JS SDK)`
-  - Проверьте что `required_namespaces` содержит Qubic
-
-## 🔧 Что делать если ошибка повторяется
-
-### Если видите Error от кошелька:
-
-1. **Скопируйте полный текст ошибки из логов**
-   - Код ошибки
-   - Сообщение ошибки
-
-2. **Проверьте код ошибки:**
-   - `5000` = User rejected (пользователь отклонил)
-   - `5001` = Unauthorized (неавторизован)
-   - Другие коды = специфичные ошибки WalletConnect
-
-3. **Проверьте topic в URI:**
-   - Убедитесь что topic меняется при каждом запуске
-   - Если topic одинаковый - проблема в генерации
-
-4. **Сравните с JavaScript версией:**
-   - Запустите JavaScript версию
-   - Сравните URI которые генерируются
-   - Сравните SessionPropose сообщения
-
-### Если не видите никаких ответов:
-
-1. **Проверьте интернет соединение**
-2. **Проверьте Project ID** - правильный ли он
-3. **Проверьте relay сервер** - доступен ли он
-4. **Проверьте логику listener_loop** - работает ли она
-
-## 📝 Отправка логов для анализа
-
-Если ошибка повторяется, соберите следующую информацию:
-
-1. **Полный лог файл:**
-   ```bash
-   cargo run 2>&1 | tee walletconnect_debug.log
-   ```
-
-2. **URI который был сгенерирован** (первые 100 символов)
-
-3. **Сообщение об ошибке от кошелька** (если есть)
-
-4. **Время от создания URI до ошибки**
-
-5. **Версия кошелька** (если известна)
-
-## 🎯 Ожидаемый результат
-
-После запуска с новым логированием вы должны четко видеть:
-
-- ✅ Что именно отправляется кошельку
-- ✅ Какой ответ получаем от кошелька  
-- ✅ На каком этапе происходит ошибка
-- ✅ Точное сообщение об ошибке с кодом
-
-Это поможет понять **почему** кошелек отклоняет подключение.
-
----
-
-**Следующий шаг:** Запустите `cargo run` и отсканируйте QR-код, затем проверьте логи!
+Next step: run `cargo run`, scan the QR, and review the debug logs.
 

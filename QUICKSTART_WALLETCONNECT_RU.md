@@ -1,203 +1,132 @@
-# 🚀 Быстрый старт - WalletConnect для Qubic (Rust)
+# 🚀 Quick Start - WalletConnect for Qubic (Rust)
 
-## Что было исправлено?
+This file used to be written in Russian; it is now fully in English.
 
-**Проблема:** Кошелек показывал "Соединение было установлено через этот URL" и отказывался подключаться.
+## What was fixed?
 
-**Решение:** ✅ Добавлена автоматическая очистка старых сессий (как в JavaScript версии).
+**Problem:** The wallet displayed “Connection was established via this URL” and refused to connect.  
+**Fix:** ✅ The Qubic namespace is now provided via `required_namespaces` (and old state is cleaned up before reconnect).
 
-## ⚡ Запуск
+## ⚡ Run
 
-### 1. Простой запуск
+### 1. Simple run
 ```bash
 cargo run
 ```
 
-### 2. Следуйте инструкциям в консоли
+### 2. Follow the console instructions
+You should see something like:
+
 ```
-╔════════════════════════════════════════════════════════════╗
-║  🔗 WalletConnect для Qubic - Подключение по QR-коду      ║
-╚════════════════════════════════════════════════════════════╝
+┌──────────────────────────────────────────────────────────┐
+│  🔗 WalletConnect for Qubic - QR connection               │
+└──────────────────────────────────────────────────────────┘
 
-📝 Шаг 1: Создание конфигурации WalletConnect...
-✅ Конфигурация создана
+Step 1: Creating WalletConnect configuration...
+✅ Configuration created
 
-🔧 Шаг 2: Создание WalletConnect клиента...
-✅ Клиент создан
+Step 2: Creating WalletConnect client...
+✅ Client created
 
-🔌 Шаг 3: Инициализация клиента...
-✅ Клиент инициализирован успешно
+Step 3: Initializing client...
+✅ Client initialized successfully
 
-📱 Шаг 4: Генерация URI для QR-кода...
-   ℹ️  Старые сессии автоматически очищаются
-   ℹ️  Каждый запуск создает НОВЫЙ уникальный URI для подключения
-   ℹ️  Это предотвращает ошибки 'соединение уже установлено'
+Step 4: Generating URI for QR code...
+ℹ️  Old sessions/state are cleaned up automatically
+ℹ️  Each run generates a NEW unique URI
+✅ URI generated successfully
 
-✅ URI сгенерирован успешно
+[QR code renders here]
 
-╔════════════════════════════════════════════════════════════╗
-║                    QR КОД ДЛЯ СКАНИРОВАНИЯ                 ║
-╚════════════════════════════════════════════════════════════╝
+How to connect:
+1) Open your Qubic wallet on your phone
+2) Find WalletConnect
+3) Scan the QR code
+4) Approve the connection in the wallet
 
-[QR-код отображается здесь]
-
-╔════════════════════════════════════════════════════════════╗
-║                   КАК ПОДКЛЮЧИТЬСЯ                         ║
-╚════════════════════════════════════════════════════════════╝
-
-1️⃣  Откройте ваш Qubic кошелек на телефоне
-2️⃣  Найдите функцию WalletConnect
-3️⃣  Отсканируйте QR-код выше
-4️⃣  Подтвердите подключение в кошельке
-
-╔════════════════════════════════════════════════════════════╗
-║              ⏳ ОЖИДАНИЕ ПОДКЛЮЧЕНИЯ КОШЕЛЬКА              ║
-╚════════════════════════════════════════════════════════════╝
-
-   ⏳ Ожидание... (осталось: 120с)
+Waiting for wallet connection... (timeout: 120s)
 ```
 
-### 3. Отсканируйте QR-код
-- Откройте кошелек Qubic на телефоне
-- Найдите WalletConnect
-- Отсканируйте QR-код
-- Подтвердите подключение
+### 3. Scan the QR code
+- Open the Qubic wallet on your phone
+- Find WalletConnect
+- Scan the QR code
+- Approve the connection
 
-### 4. Готово! ✅
-```
-╔════════════════════════════════════════════════════════════╗
-║              ✅ КОШЕЛЕК УСПЕШНО ПОДКЛЮЧЕН!                 ║
-╚════════════════════════════════════════════════════════════╝
+### 4. Done ✅
+After a successful connection you should see session info and can perform requests.
 
-📊 Информация о сессии:
-   Topic: abcd1234...
-   Истекает через: 24 часов
-   Relay protocol: irn
-   Статус: Активна ✅
-```
+## 🔧 Use it in your own code
 
-## 🔧 Использование в своем коде
+The core flow:
+1. create config
+2. create client
+3. `init()`
+4. `connect()` → show URI as QR
+5. wait for the wallet to approve
+6. call methods (`request_accounts`, `sign_message`, `send_transaction`, etc.)
 
-```rust
-use scapi::wallet_connect::*;
+See `WALLET_CONNECT_QUICKSTART.md` and `WALLET_CONNECT_API.md` for examples.
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Конфигурация
-    let config = WalletConnectConfig::new(
-        "YOUR_PROJECT_ID".to_string(),
-        "qubic:mainnet".to_string()
-    );
-    
-    // Создание клиента
-    let mut client = WalletConnectClient::new(config);
-    client.init().await?;
-    
-    // Генерация QR-кода (старые сессии автоматически очищаются!)
-    let uri = client.connect().await?;
-    println!("Scan: {}", uri);
-    
-    // Ожидание подключения (2 минуты timeout)
-    match client.wait_for_connection(120).await {
-        Ok(true) => println!("✅ Connected!"),
-        Ok(false) => println!("❌ Rejected"),
-        Err(e) => println!("⏰ Timeout: {}", e),
-    }
-    
-    Ok(())
-}
-```
+## ❓ FAQ
 
-## ❓ Часто задаваемые вопросы
+### Q: Do I need to manually delete old sessions in the wallet?
+**A:** Usually no. The client cleans up old state automatically on each run.
 
-### Q: Нужно ли удалять старые сессии в кошельке?
-**A:** Нет! Теперь они очищаются автоматически при каждом запуске.
+### Q: What if the wallet still says “connection already established”?
+**A:** Restart the program to get a fresh URI, and clear old sessions in the wallet if needed.
 
-### Q: Что делать если кошелек показывает "соединение уже установлено"?
-**A:** Эта проблема исправлена. Просто перезапустите программу `cargo run`.
+### Q: How long is a QR code valid?
+**A:** The URI includes an expiry (often 5 minutes). The sample waits 120 seconds by default.
 
-### Q: Сколько времени действует QR-код?
-**A:** 5 минут (300 секунд). Программа ждет подключения 120 секунд (2 минуты).
+### Q: Can I reuse the same QR code multiple times?
+**A:** No. Each QR code/URI is single-use.
 
-### Q: Можно ли использовать один QR-код несколько раз?
-**A:** Нет. Каждый QR-код уникален и используется только один раз. При каждом запуске создается новый.
+### Q: Where do I get a Project ID?
+**A:** Create a project at https://cloud.walletconnect.com/ and copy the Project ID.
 
-### Q: Где взять Project ID?
-**A:** Зарегистрируйтесь на https://cloud.walletconnect.com/ и создайте новый проект.
+### Q: Does it work with any wallet?
+**A:** It works with wallets that support WalletConnect v2 and the Qubic namespace.
 
-### Q: Работает ли это с любым кошельком?
-**A:** Работает с кошельками, которые поддерживают WalletConnect v2.0 и Qubic.
+## 📚 Additional docs
 
-## 📚 Дополнительная документация
-
-- **Подробное описание исправления:** `WALLETCONNECT_FIX_RU.md`
-- **История изменений:** `CHANGELOG_WALLETCONNECT.md`
-- **Полная документация API:** `WALLET_CONNECT_API.md`
-- **Примеры:** `examples/wallet_connect_*.rs`
+- Root-cause write-up: `WALLETCONNECT_FIX_REQUIRED_NAMESPACES.md`
+- Changelog: `CHANGELOG_WALLETCONNECT.md`
+- Full API reference: `WALLET_CONNECT_API.md`
+- Examples: `examples/wallet_connect_*.rs`
 
 ## 🐛 Troubleshooting
 
-### Ошибка: "Project ID is required"
+### Error: “Project ID is required”
+Set your Project ID via environment variable or in code:
+
 ```bash
-# Установите Project ID в переменную окружения
-export WALLET_CONNECT_PROJECT_ID=your_project_id_here
-
-# Или измените в коде main.rs:
-let project_id = "YOUR_PROJECT_ID_HERE".to_string();
+set WALLETCONNECT_PROJECT_ID=your_project_id
 ```
 
-### Ошибка: "Connection timeout"
-- Проверьте интернет соединение
-- Убедитесь что кошелек запущен и разблокирован
-- Попробуйте увеличить timeout: `wait_for_connection(300)` (5 минут)
+### Error: “Connection timeout”
+- check your internet connection
+- ensure the wallet is open and unlocked
+- increase timeout if needed (example): `wait_for_connection(300)`
 
-### Ошибка: "Failed to initialize WalletConnect Client"
-- Проверьте что Project ID правильный
-- Проверьте интернет соединение
-- Попробуйте перезапустить программу
+### Error: “Failed to initialize WalletConnect Client”
+- verify the Project ID
+- check network connectivity
+- retry
 
-### QR-код не отображается в консоли
-- Это нормально в release режиме
-- Используйте URI напрямую или сгенерируйте QR онлайн:
-  - https://www.qr-code-generator.com/
+### QR code does not render in the console
+- this can happen in some terminals/modes
+- use the URI directly, or render a QR via an external tool
 
-## ✨ Что дальше?
+## ✨ What’s next?
 
-После успешного подключения вы можете:
+After a successful connection you can:
+- request accounts
+- sign messages
+- sign and send transactions
+- subscribe to events
 
-```rust
-// Получить аккаунты
-let accounts = client.request_accounts().await?;
+## 🎉 Finished
 
-// Подписать сообщение
-let signature = client.sign_message(
-    "ACCOUNT_ID", 
-    "Hello Qubic!"
-).await?;
-
-// Отправить транзакцию
-let result = client.send_transaction(
-    QubicTransactionParams {
-        from: "FROM_ADDRESS",
-        to: "TO_ADDRESS",
-        amount: 1000,
-        tick: Some(12345678),
-        input_type: Some(0),
-        payload: None,
-    }
-).await?;
-
-// Отключиться
-client.disconnect().await?;
-```
-
-## 🎉 Готово!
-
-Теперь ваш Rust проект использует WalletConnect так же, как JavaScript версия, но без проблем с повторными подключениями!
-
----
-
-**Нужна помощь?** Создайте issue в репозитории или проверьте документацию.
-
-**Последнее обновление:** 2025-11-01
+Last updated: 2025-11-01
 

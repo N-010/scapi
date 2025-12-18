@@ -1,165 +1,110 @@
-# WalletConnect для Qubic - Быстрый старт
+# WalletConnect for Qubic - Quick Start
 
-## 🚀 5-минутная интеграция
+## 🚀 5-minute integration
 
-### Шаг 1: Получение Project ID
+### Step 1: Get a Project ID
+1. Go to https://cloud.walletconnect.com/
+2. Create a new project
+3. Copy the **Project ID**
 
-1. Зайдите на [WalletConnect Cloud](https://cloud.walletconnect.com/)
-2. Создайте новый проект
-3. Скопируйте **Project ID**
+### Step 2: Install
+Add this crate via a path dependency (example):
 
-### Шаг 2: Установка
-
-Добавьте в ваш проект:
-
-```rust
-// В вашем main.rs или lib.rs
-use scapi::wallet_connect::*;
+```toml
+[dependencies]
+scapi = { path = "../scapi" }
 ```
 
-### Шаг 3: Базовый код
+### Step 3: Minimal code
 
 ```rust
-use scapi::wallet_connect::*;
+use scapi::wallet_connect::{WalletConnectClient, WalletConnectConfig, ClientMetadata};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // 1. Конфигурация
-    let config = WalletConnectConfig::new(
-        "YOUR_PROJECT_ID".to_string(),
-        "qubic:mainnet".to_string()
-    );
+    let config = WalletConnectConfig {
+        project_id: std::env::var(\"WALLETCONNECT_PROJECT_ID\")?,
+        qubic_chain_id: \"qubic:mainnet\".to_string(),
+        metadata: ClientMetadata {
+            name: \"My Qubic dApp\".to_string(),
+            description: \"WalletConnect demo\".to_string(),
+            url: \"https://example.com\".to_string(),
+            icons: vec![],
+        },
+        relay_url: None,
+    };
 
-    // 2. Создание клиента
-    let mut client = WalletConnectClient::new(config);
-    
-    // 3. Инициализация
+    let mut client = WalletConnectClient::new(config)?;
     client.init().await?;
-    
-    // 4. Получение QR-кода URI
+
     let uri = client.connect().await?;
-    println!("QR Code URI: {}", uri);
-    
-    // 5. После сканирования - запрос аккаунтов
+    println!(\"Scan this URI as a QR: {uri}\");
+
+    let ok = client.wait_for_connection(120).await?;
+    if !ok {
+        println!(\"Connection rejected\");
+        return Ok(());
+    }
+
     let accounts = client.request_accounts().await?;
-    println!("Connected: {:?}", accounts);
-    
+    println!(\"Accounts: {accounts:?}\");
+
     Ok(())
 }
 ```
 
-### Шаг 4: Запуск
-
+### Step 4: Run
 ```bash
-cargo run --example wallet_connect_basic
+cargo run
 ```
 
-## 🌐 Использование в браузере
+## 🌐 Browser usage (WASM)
 
-### Шаг 1: Сборка WASM
-
+### Step 1: Build WASM
 ```bash
 wasm-pack build --target web
 ```
 
-### Шаг 2: HTML
+### Step 2: HTML
+Use `pkg/scapi.js` from your app and render the generated URI as a QR using any JS QR library.
 
-```html
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Qubic WalletConnect</title>
-    <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
-</head>
-<body>
-    <div id="qrcode"></div>
-    <button id="connect">Connect Wallet</button>
-    <div id="status"></div>
+## 📱 Supported wallets
+- Any wallet that supports WalletConnect v2 and the Qubic namespace
 
-    <script type="module">
-        import init, { WalletConnectClient } from './pkg/scapi.js';
+## 🔐 Security
 
-        async function main() {
-            await init();
+✅ Recommended:
+- use HTTPS in production
+- keep the Project ID in environment variables / configuration
+- verify transaction signatures (server-side where appropriate)
 
-            const client = new WalletConnectClient(
-                'YOUR_PROJECT_ID',
-                'qubic:mainnet'
-            );
+❌ Avoid:
+- storing private keys in app code
+- sending transactions without explicit user approval
 
-            document.getElementById('connect').onclick = async () => {
-                await client.initClient();
-                const uri = await client.genConnectUrl();
-                
-                // Показать QR-код
-                QRCode.toCanvas(
-                    document.getElementById('qrcode'),
-                    uri,
-                    (error) => {
-                        if (error) console.error(error);
-                    }
-                );
+## 🐛 Debugging
 
-                document.getElementById('status').innerText = 
-                    'Scan QR code in your Qubic wallet';
-            };
-        }
-
-        main();
-    </script>
-</body>
-</html>
+### Enable logs
+```bash
+set RUST_LOG=debug
+cargo run
 ```
 
-## 📱 Поддерживаемые кошельки
+### Connection checks
+- verify that `connect()` produces a new URI each run
+- verify Qubic is in `required_namespaces`
 
-- **Qubic Wallet App** (iOS, Android)
-- Любой кошелек с поддержкой WalletConnect v2
+## 📚 Resources
+- Full API reference: `WALLET_CONNECT_API.md`
+- Examples: `examples/`
+- Troubleshooting: `TROUBLESHOOTING.md`
 
-## 🔐 Безопасность
+## 💬 Support
+If something does not work:
+1. Check `TROUBLESHOOTING.md`
+2. Check examples in `examples/`
+3. Open an issue with logs and the generated URI (redact secrets)
 
-✅ **Рекомендуется:**
-- Используйте HTTPS для production
-- Храните Project ID в переменных окружения
-- Проверяйте подписи транзакций
-
-❌ **Не делайте:**
-- Не храните приватные ключи в коде
-- Не отправляйте транзакции без подтверждения пользователя
-
-## 🐛 Отладка
-
-### Включение логов
-
-```rust
-// Добавьте в начало main()
-tracing_subscriber::fmt::init();
-```
-
-### Проверка подключения
-
-```rust
-if client.is_session_active() {
-    println!("✅ Connected");
-} else {
-    println!("❌ Not connected");
-}
-```
-
-## 📚 Дополнительные ресурсы
-
-- [Полная документация](./WALLET_CONNECT_API.md)
-- [Примеры кода](./examples/)
-- [Qubic Wallet Spec](https://github.com/qubic/wallet-app/blob/main/walletconnect.md)
-
-## 💬 Поддержка
-
-Если у вас возникли вопросы:
-1. Проверьте [документацию](./WALLET_CONNECT_API.md)
-2. Посмотрите [примеры](./examples/)
-3. Создайте issue в репозитории
-
-## 🎉 Готово!
-
-Теперь ваше приложение может подключаться к Qubic кошелькам через WalletConnect!
+## 🎉 Done
+Your app can now connect to Qubic wallets via WalletConnect.
 

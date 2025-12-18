@@ -1,182 +1,82 @@
-# ✅ НАСТОЯЩЕЕ ИСПРАВЛЕНИЕ: requiredNamespaces vs optionalNamespaces
+# ✅ Root cause fix: `requiredNamespaces` vs `optionalNamespaces`
 
-## 🔴 Реальная проблема
+## 🔴 Problem
 
-Кошелек отклонял подключение с сообщением: **"Соединение было установлено через этот URL"**
+The wallet rejected the connection with:
+> “Connection was established via this URL”
 
-### Истинная причина
+### Root cause
 
-**Проблема была НЕ в очистке старых сессий** (хотя это тоже было добавлено для совместимости).
+The Rust implementation used **`optional_namespaces`** while the JavaScript SDK uses **`requiredNamespaces`** for Qubic.
 
-**Реальная проблема:** В Rust версии использовался **`optional_namespaces`**, а в JavaScript SDK - **`requiredNamespaces`**!
+## 🔍 Comparison
 
-## 🔍 Сравнение
-
-### JavaScript (qraw-frontend/src/api/wallet-connect-client.ts):
-```javascript
-const { uri, approval } = await client.connect({
-    requiredNamespaces: {           // ← REQUIRED!
-        qubic: {
-            methods: Object.values(QubicNsMethods),
-            chains: [this.qubicChainId ?? ''],
-            events: Object.values(WalletEvents),
-        },
-    },
-});
-```
-
-### Rust (ДО исправления):
+### Rust (before)
 ```rust
-let session_propose = SessionProposeParams {
-    required_namespaces: HashMap::new(),    // ← ПУСТО!
-    optional_namespaces,                     // ← Qubic здесь (НЕПРАВИЛЬНО!)
-    relays: vec![...],
-    ...
-};
+required_namespaces: HashMap::new(), // empty
+optional_namespaces,                // Qubic was here (wrong)
 ```
 
-### Rust (ПОСЛЕ исправления):
+### Rust (after)
 ```rust
-let session_propose = SessionProposeParams {
-    required_namespaces,                     // ← Qubic здесь (ПРАВИЛЬНО!)
-    optional_namespaces: HashMap::new(),
-    relays: vec![...],
-    ...
-};
+required_namespaces,                 // Qubic is required (correct)
+optional_namespaces: HashMap::new(), // empty
 ```
 
-## ⚡ Что было изменено
+## ⚡ What changed
 
-**Файл:** `src/wallet_connect/client.rs`
+**File:** `src/wallet_connect/client.rs`
+- moved Qubic namespace from optional → required
+- kept optional empty (or used only for truly optional features)
 
-```rust
-// БЫЛО (строки 186-196):
-let namespace = QubicNamespace::new(self.config.qubic_chain_id.clone());
-let mut optional_namespaces = HashMap::new();
-optional_namespaces.insert(
-    QUBIC_NAMESPACE.to_string(),
-    WcNamespace {
-        accounts: None,
-        chains: namespace.chains.clone(),
-        events: namespace.events.clone(),
-        methods: namespace.methods.clone(),
-    },
-);
+## 🎯 Why this matters
 
-let session_propose = SessionProposeParams {
-    required_namespaces: HashMap::new(),
-    optional_namespaces,
-    ...
-};
+### `requiredNamespaces`
+- mandatory requirements for the session
+- the wallet must support these chains/methods
+- used for core blockchain functionality
 
-// СТАЛО (строки 186-213):
-let namespace = QubicNamespace::new(self.config.qubic_chain_id.clone());
+### `optionalNamespaces`
+- optional capabilities the wallet may support
+- the session can still be established without them
+- used for non-critical extras
 
-// IMPORTANT: Use requiredNamespaces (not optional) to match JavaScript SDK behavior
-// This ensures wallet properly validates the connection request
-let mut required_namespaces = HashMap::new();
-required_namespaces.insert(
-    QUBIC_NAMESPACE.to_string(),
-    WcNamespace {
-        accounts: None,
-        chains: namespace.chains.clone(),
-        events: namespace.events.clone(),
-        methods: namespace.methods.clone(),
-    },
-);
+## 📊 Result
 
-tracing::debug!("[WalletConnect] Using REQUIRED namespaces (matching JS SDK)");
+| Parameter | Before | After |
+|---|---|---|
+| `required_namespaces` | `{}` | `{ qubic: {...} }` |
+| `optional_namespaces` | `{ qubic: {...} }` | `{}` |
+| Wallet behavior | ❌ rejects | ✅ accepts |
+| Parity with JS SDK | ❌ no | ✅ yes |
 
-let session_propose = SessionProposeParams {
-    required_namespaces,
-    optional_namespaces: HashMap::new(),
-    ...
-};
-```
+## 🚀 Verification
 
-## 🎯 Почему это важно?
-
-### requiredNamespaces
-- **Обязательные** требования для подключения
-- Кошелек **ДОЛЖЕН** поддерживать эти методы/chains
-- Если не поддерживает - подключение отклоняется
-- Используется для **критичных** функций
-
-### optionalNamespaces
-- **Необязательные** возможности
-- Кошелек **МОЖЕТ** поддерживать эти методы
-- Если не поддерживает - подключение всё равно проходит
-- Используется для **дополнительных** функций
-
-### Что происходило?
-
-1. **Rust версия (до исправления):**
-   - Отправляла Qubic в `optionalNamespaces`
-   - Кошелек видел: "эти методы необязательны"
-   - Кошелек думал: "это не основной запрос подключения"
-   - Кошелек отклонял как дубликат или некорректный запрос
-
-2. **JavaScript версия:**
-   - Отправляет Qubic в `requiredNamespaces`
-   - Кошелек видит: "это обязательное подключение к Qubic"
-   - Кошелек правильно обрабатывает запрос
-
-3. **Rust версия (после исправления):**
-   - Отправляет Qubic в `requiredNamespaces`
-   - Поведение **идентично** JavaScript версии
-   - Кошелек правильно принимает подключение
-
-## 📊 Результат
-
-| Параметр | До исправления | После исправления |
-|----------|---------------|-------------------|
-| `required_namespaces` | `{}` (пусто) | `{ qubic: {...} }` |
-| `optional_namespaces` | `{ qubic: {...} }` | `{}` (пусто) |
-| Поведение кошелька | ❌ Отклоняет | ✅ Принимает |
-| Соответствие JS SDK | ❌ Нет | ✅ Полное |
-
-## 🚀 Проверка
-
-Запустите программу:
 ```bash
+set RUST_LOG=debug
 cargo run
 ```
 
-Теперь вы должны увидеть в логах:
-```
-[WalletConnect] Using REQUIRED namespaces (matching JS SDK)
-[WalletConnect] Chains: ["qubic:mainnet"]
-[WalletConnect] Methods: [...]
-```
+Confirm logs indicate Qubic is placed in `required_namespaces`, then scan the QR code and approve the session.
 
-И кошелек должен **успешно подключиться** без ошибки "соединение уже установлено"!
+## 📝 Additional improvements
 
-## 📝 Дополнительные изменения
+Along with the root fix:
+1. `cleanup_old_state()` clears stale state before reconnects
+2. better logging clarifies which namespaces are used
+3. documentation and quick start were updated
 
-Помимо основного исправления, были добавлены:
+## ⚠️ Important note
 
-1. **Метод `cleanup_old_state()`** - очистка старых сессий (для полной совместимости с JS SDK)
-2. **Улучшенное логирование** - видно какие namespaces используются
-3. **Подробная документация** - понятно почему используются requiredNamespaces
+If you build your own WalletConnect client:
+- ✅ use `requiredNamespaces` for core chain methods
+- ❌ do not put critical methods into `optionalNamespaces`
 
-## ⚠️ Важное примечание
+## 🔗 Related files
+- `src/wallet_connect/client.rs` - root fix
+- `WALLETCONNECT_FIX_RU.md` - note (now English)
+- `QUICKSTART_WALLETCONNECT_RU.md` - quick start (now English)
 
-Если вы разрабатываете свой WalletConnect клиент:
-
-✅ **ИСПОЛЬЗУЙТЕ `requiredNamespaces`** для основных функций вашего блокчейна  
-❌ **НЕ ИСПОЛЬЗУЙТЕ `optionalNamespaces`** для критичных методов
-
-`optionalNamespaces` подходит только для дополнительных, необязательных функций, которые кошелек может не поддерживать.
-
-## 🔗 Связанные файлы
-
-- `src/wallet_connect/client.rs` - основное исправление
-- `WALLETCONNECT_FIX_RU.md` - дополнительная информация
-- `QUICKSTART_WALLETCONNECT_RU.md` - инструкции по использованию
-
----
-
-**Дата исправления:** 2025-11-01  
-**Проблема:** requiredNamespaces vs optionalNamespaces  
-**Статус:** ✅ Исправлено
+**Date:** 2025-11-01  
+**Status:** ✅ fixed  
 

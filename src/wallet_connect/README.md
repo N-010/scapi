@@ -1,209 +1,108 @@
-# WalletConnect Module для Qubic
+# WalletConnect Module for Qubic
 
-Этот модуль предоставляет полную реализацию WalletConnect v2 протокола для Qubic blockchain.
+This module provides a WalletConnect v2 implementation for the Qubic blockchain, including a native Rust client and WASM bindings for browser usage.
 
-## 📁 Структура модуля
+## 📁 Module layout
 
 ```
-wallet_connect/
-├── mod.rs              # Главный модуль, экспорты
-├── types.rs            # Типы данных и структуры
-├── client.rs           # Основной WalletConnect клиент
-├── session.rs          # Управление сессиями
-├── events.rs           # Обработка событий
-├── qubic_namespace.rs  # Qubic-специфичные методы
-└── wasm_bindings.rs    # WASM биндинги для браузера
+src/wallet_connect/
+├── mod.rs              # Module exports
+├── types.rs            # Types and error definitions
+├── client.rs           # Main WalletConnect client
+├── session.rs          # Session state and helpers
+├── events.rs           # Event handler and event types
+├── qubic_namespace.rs  # Qubic namespace methods/events
+└── wasm_bindings.rs    # WASM/JS bindings
 ```
 
-## 🔑 Ключевые компоненты
+## 🔑 Key components
 
 ### WalletConnectClient
-
-Главный класс для взаимодействия с WalletConnect:
-
-```rust
-use scapi::wallet_connect::*;
-
-let config = WalletConnectConfig::new(
-    "project_id".to_string(),
-    "qubic:mainnet".to_string()
-);
-
-let mut client = WalletConnectClient::new(config);
-client.init().await?;
-```
+Main entry point for interacting with WalletConnect:
+- create config
+- initialize relay connectivity
+- generate a URI (`connect()`)
+- wait for approval
+- execute requests over the Qubic namespace
 
 ### Types
-
-Основные типы данных:
-- `WalletConnectConfig` - конфигурация клиента
-- `WalletAccount` - информация об аккаунте
-- `QubicTransactionParams` - параметры транзакции
-- `SignatureResponse` - ответ с подписью
-- `WalletConnectionStatus` - статус подключения
+Core data structures include:
+- `WalletConnectConfig`
+- `WalletAccount`
+- `QubicTransactionParams`
+- `SignatureResponse`
+- `WalletConnectionStatus`
 
 ### Events
+Event system to react to session state changes:
+- `WalletConnectEvent` - event types
+- `EventCallback` - callback trait
+- `EventHandler` - event dispatcher/registry
 
-Система событий для реагирования на изменения:
-- `WalletConnectEvent` - типы событий
-- `EventCallback` - trait для обработчиков
-- `EventHandler` - менеджер событий
+### Qubic namespace
+Qubic-specific WalletConnect methods:
+- `qubic_requestAccounts`
+- `qubic_sendQubic`
+- `qubic_signTransaction`
+- `qubic_sendTransaction`
+- `qubic_sign`
 
-### Qubic Namespace
+## 🎯 Core flows
 
-Qubic-специфичные методы WalletConnect:
-- `qubic_requestAccounts` - запрос аккаунтов
-- `qubic_sendQubic` - отправка Qubic
-- `qubic_signTransaction` - подпись транзакции
-- `qubic_sendTransaction` - отправка транзакции
-- `qubic_sign` - подпись сообщения
+### 1. Connect to a wallet
+Generate a URI and show it as a QR code to the user.
 
-## 🎯 Основные возможности
+### 2. Request accounts
+After approval, call `request_accounts()` to get wallet accounts.
 
-### 1. Подключение к кошельку
+### 3. Send transactions
+Use `send_qubic()` for a simple transfer, or use transaction params for more control.
 
-```rust
-let uri = client.connect().await?;
-// Отобразите uri как QR-код
-```
+### 4. Event handling
+Register callbacks on the event handler to observe proposals, session updates, and other events.
 
-### 2. Запрос аккаунтов
+## 🌐 WASM support
+The module supports WebAssembly builds and exposes a JS-friendly API via `wasm_bindings.rs`.
 
-```rust
-let accounts = client.request_accounts().await?;
-for account in accounts {
-    println!("Address: {}", account.address);
-}
-```
+## 🔒 Security
+- crypto operations remain in the wallet
+- private keys are never transmitted by this client
+- session management aims to avoid stale state and topic reuse
 
-### 3. Отправка транзакции
+## 📊 Architecture notes
+- clear separation of concerns between types/client/session/events
+- event-driven design for async session lifecycle
 
-```rust
-let params = QubicTransactionParams {
-    from: "SENDER_ADDRESS".to_string(),
-    to: "RECIPIENT_ADDRESS".to_string(),
-    amount: 1_000_000,
-    tick: None,
-    input_type: Some(0),
-    payload: None,
-};
-
-let result = client.send_transaction(params).await?;
-```
-
-### 4. Обработка событий
-
-```rust
-use scapi::wallet_connect::events::*;
-
-struct MyHandler;
-
-impl EventCallback for MyHandler {
-    fn on_event(&self, event: WalletConnectEvent, payload: serde_json::Value) {
-        println!("Event: {:?}", event);
-    }
-}
-
-client.event_handler().register(Box::new(MyHandler));
-```
-
-## 🌐 WASM Support
-
-Модуль полностью поддерживает компиляцию в WebAssembly для использования в браузере:
-
+## 🧪 Testing
+Run examples:
 ```bash
-wasm-pack build --target web
-```
-
-JavaScript/TypeScript использование:
-
-```javascript
-import { WalletConnectClient } from './pkg/scapi.js';
-
-const client = new WalletConnectClient('project_id', 'qubic:mainnet');
-await client.initClient();
-const uri = await client.genConnectUrl();
-```
-
-## 🔒 Безопасность
-
-Модуль следует лучшим практикам безопасности:
-- Все криптографические операции выполняются в кошельке
-- Приватные ключи никогда не передаются через сеть
-- Поддержка проверки подписей
-- Безопасное управление сессиями
-
-## 📊 Архитектура
-
-```
-┌─────────────────┐
-│   Your dApp     │
-└────────┬────────┘
-         │
-    ┌────▼────────────────────┐
-    │ WalletConnectClient     │
-    ├─────────────────────────┤
-    │ - connect()             │
-    │ - request_accounts()    │
-    │ - send_transaction()    │
-    └────────┬────────────────┘
-             │
-    ┌────────▼────────────────┐
-    │   Event System          │
-    │   (EventHandler)        │
-    └────────┬────────────────┘
-             │
-    ┌────────▼────────────────┐
-    │   Session Manager       │
-    └────────┬────────────────┘
-             │
-    ┌────────▼────────────────┐
-    │  WalletConnect Relay    │
-    │  (relay.walletconnect)  │
-    └────────┬────────────────┘
-             │
-    ┌────────▼────────────────┐
-    │   Qubic Wallet App      │
-    └─────────────────────────┘
-```
-
-## 🧪 Тестирование
-
-Запустите примеры для тестирования:
-
-```bash
-# Базовое подключение
+# Basic connection
 cargo run --example wallet_connect_basic
 
-# Отправка транзакции
+# Transaction flow
 cargo run --example wallet_connect_transaction
 
-# Обработка событий
+# Event handling
 cargo run --example wallet_connect_events
 ```
 
-## 📖 Дальнейшее чтение
+## 📖 Further reading
+- `WALLET_CONNECT_INDEX.md`
+- `WALLET_CONNECT_API.md`
+- `WALLET_CONNECT_QUICKSTART.md`
+- `TROUBLESHOOTING.md`
 
-- [API Documentation](../../WALLET_CONNECT_API.md)
-- [Quick Start Guide](../../WALLET_CONNECT_QUICKSTART.md)
-- [WalletConnect Docs](https://docs.walletconnect.com/)
-- [Qubic Wallet Spec](https://github.com/qubic/wallet-app/blob/main/walletconnect.md)
+## 🤝 Contributing
+When adding new functionality:
+1. keep the module structure and naming consistent
+2. add documentation and update examples
+3. validate on both native and WASM targets where applicable
 
-## 🤝 Вклад в разработку
-
-При добавлении новых функций:
-1. Следуйте существующей структуре кода
-2. Добавляйте документацию
-3. Обновляйте примеры
-4. Тестируйте на WASM и native
-
-## 📝 История изменений
-
-### v0.1.0 (текущая)
-- ✅ Базовая реализация WalletConnect v2
-- ✅ Поддержка Qubic namespace
-- ✅ WASM биндинги
-- ✅ Система событий
-- ✅ Управление сессиями
-- ✅ Примеры и документация
+## 📝 Changelog
+### v0.1.0 (current)
+- ✅ basic WalletConnect v2 implementation
+- ✅ Qubic namespace support
+- ✅ WASM bindings
+- ✅ event system
+- ✅ examples and documentation
 

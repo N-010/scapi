@@ -1,154 +1,84 @@
-# 🧪 Тестирование исправления WalletConnect
+# 🧪 Testing the WalletConnect Fix
 
-## ✅ Что было исправлено
+## ✅ What was fixed
 
-**КРИТИЧНОЕ ИСПРАВЛЕНИЕ:** Изменен `optional_namespaces` → `required_namespaces`
+**Critical fix:** switched from `optional_namespaces` to `required_namespaces`.  
+This is the real reason behind the wallet-side rejection/error.
 
-Это **настоящая причина** ошибки "Соединение было установлено через этот URL"!
+## 🚀 Run the test
 
-## 🚀 Запуск тестирования
-
-### 1. Запустите программу
+### 1. Run the program
 ```bash
-cd "D:\Work\MySelf\Qubic\SCAPI"
 cargo run
 ```
 
-### 2. Что должно появиться
+### 2. Expected console output
+You should see:
 
 ```
-╔════════════════════════════════════════════════════════════╗
-║  🔗 WalletConnect для Qubic - Подключение по QR-коду      ║
-╚════════════════════════════════════════════════════════════╝
-
-📝 Шаг 1: Создание конфигурации WalletConnect...
-✅ Конфигурация создана
-
-🔧 Шаг 2: Создание WalletConnect клиента...
-✅ Клиент создан
-
-🔌 Шаг 3: Инициализация клиента...
-✅ Клиент инициализирован успешно
-
-📱 Шаг 4: Генерация URI для QR-кода...
-   ℹ️  Старые сессии автоматически очищаются
-   ℹ️  Каждый запуск создает НОВЫЙ уникальный URI для подключения
-
-✅ URI сгенерирован успешно
+🔗 WalletConnect for Qubic - QR connection
+Step 1: Creating configuration...
+Step 2: Creating client...
+Step 3: Initializing...
+Step 4: Generating URI...
+ℹ️  Old sessions/state are cleaned up automatically
+ℹ️  Each run generates a NEW unique URI
+✅ URI generated successfully
 ```
 
-### 3. В DEBUG логах должно быть
+### 3. Expected debug logs
+If you run with `RUST_LOG=debug`, you should see that Qubic is placed in `required_namespaces`.
 
-Если вы запускаете с `RUST_LOG=debug`:
 ```bash
-RUST_LOG=debug cargo run
+set RUST_LOG=debug
+cargo run
 ```
 
-Вы должны увидеть:
-```
-[WalletConnect] Using REQUIRED namespaces (matching JS SDK)
-[WalletConnect] Chains: ["qubic:mainnet"]
-[WalletConnect] Methods: ["qubic_requestAccounts", "qubic_sendQubic", ...]
-```
+### 4. Scan the QR code
+- Open the Qubic wallet on your phone
+- Find WalletConnect
+- Scan the QR code
+- Approve the connection
 
-### 4. Отсканируйте QR-код
+### 5. Expected result
+✅ **Success** — the wallet connects without the previous rejection.
 
-- Откройте Qubic кошелек на телефоне
-- Найдите WalletConnect
-- Отсканируйте QR-код
-- **Подтвердите подключение**
+## 🔍 What changed in the code
 
-### 5. Ожидаемый результат
-
-✅ **УСПЕХ** - кошелек подключается без ошибки:
-```
-╔════════════════════════════════════════════════════════════╗
-║              ✅ КОШЕЛЕК УСПЕШНО ПОДКЛЮЧЕН!                 ║
-╚════════════════════════════════════════════════════════════╝
-
-📊 Информация о сессии:
-   Topic: ...
-   Истекает через: 24 часов
-   Relay protocol: irn
-   Статус: Активна ✅
-```
-
-❌ **ОШИБКА** (не должна появиться больше):
-> "Соединение было установлено через этот URL"
-
-## 🔍 Что изменилось в коде
-
-### ДО исправления:
+### Before
 ```rust
-let session_propose = SessionProposeParams {
-    required_namespaces: HashMap::new(),    // ПУСТО! ❌
-    optional_namespaces,                     // Qubic здесь
-    ...
-};
+required_namespaces: HashMap::new(), // empty ❌
+optional_namespaces,                // Qubic was here
 ```
 
-### ПОСЛЕ исправления:
+### After
 ```rust
-let session_propose = SessionProposeParams {
-    required_namespaces,                     // Qubic здесь ✅
-    optional_namespaces: HashMap::new(),
-    ...
-};
+required_namespaces,                 // Qubic is here ✅
+optional_namespaces: HashMap::new(), // empty
 ```
 
-## 📝 Чек-лист тестирования
+## 📝 Testing checklist
+- [ ] `cargo build` succeeds
+- [ ] `cargo run` starts
+- [ ] QR code/URI is displayed
+- [ ] Wallet scans the QR successfully
+- [ ] Wallet approves the connection
+- [ ] Session becomes active
+- [ ] Restarting the program keeps working (fresh URI each run)
 
-- [ ] Программа компилируется без ошибок (`cargo build`)
-- [ ] Программа запускается (`cargo run`)
-- [ ] QR-код отображается
-- [ ] Кошелек успешно сканирует QR-код
-- [ ] **Кошелек НЕ показывает ошибку "соединение уже установлено"**
-- [ ] Подключение устанавливается успешно
-- [ ] Отображается информация о сессии
-- [ ] (Опционально) Перезапустите программу и повторите - должно работать каждый раз
+## 🐛 If the problem remains
 
-## 🐛 Если проблема осталась
+If you still see a rejection:
+1. Verify the wallet supports WalletConnect v2 + Qubic namespace
+2. Verify the Project ID is valid
+3. Clear old WalletConnect sessions in the wallet
+4. Inspect logs and confirm `required_namespaces` usage
+5. Compare the proposal payload with the JavaScript implementation
 
-Если ошибка всё ещё появляется:
+## 📚 Documentation
+- `WALLETCONNECT_FIX_REQUIRED_NAMESPACES.md` - root cause explanation
+- `WALLET_CONNECT_QUICKSTART.md` - quick start
+- `TROUBLESHOOTING.md` - common issues
 
-1. **Проверьте версию кошелька**
-   - Убедитесь что кошелек поддерживает WalletConnect v2.0
-
-2. **Проверьте Project ID**
-   - Убедитесь что Project ID правильный
-   - Получите новый на https://cloud.walletconnect.com/
-
-3. **Очистите кошелек**
-   - Удалите все старые WalletConnect сессии в кошельке
-   - Перезапустите кошелек
-
-4. **Проверьте логи**
-   ```bash
-   RUST_LOG=debug cargo run 2>&1 | tee walletconnect.log
-   ```
-   - Сохраните логи в `walletconnect.log`
-   - Проверьте есть ли строка: "Using REQUIRED namespaces"
-
-5. **Сравните с JavaScript версией**
-   - Запустите JavaScript версию из `qraw-frontend`
-   - Проверьте что она работает
-   - Сравните URI которые генерируются
-
-## 📚 Документация
-
-- **`WALLETCONNECT_FIX_REQUIRED_NAMESPACES.md`** - подробное объяснение проблемы
-- **`WALLETCONNECT_FIX_RU.md`** - общая информация
-- **`QUICKSTART_WALLETCONNECT_RU.md`** - быстрый старт
-
-## 💡 Что было изучено
-
-1. ✅ JavaScript версия использует `requiredNamespaces`
-2. ✅ Rust версия использовала `optionalNamespaces` (неправильно)
-3. ✅ Изменено на `requiredNamespaces` для соответствия
-4. ✅ Добавлена очистка старых сессий (бонус)
-5. ✅ Улучшено логирование для отладки
-
----
-
-**Следующий шаг:** Запустите `cargo run` и проверьте подключение! 🚀
+Next step: run `cargo run` and verify a successful wallet connection.
 

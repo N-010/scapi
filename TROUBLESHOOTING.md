@@ -1,160 +1,117 @@
-# Устранение проблем WalletConnect
+# WalletConnect Troubleshooting
 
-## Ошибка: "Соединение уже было установлено"
+## Error: “Connection already established”
 
-### Причины
-1. **Повторное сканирование того же QR-кода** - каждый URI уникален и может быть использован только один раз
-2. **Кэш в кошельке** - кошелек сохраняет историю подключений
-3. **Не перезапущена программа** - старый URI остался в памяти
+### Causes
+1. **Re-scanning the same QR code** — each URI is unique and can be used only once.
+2. **Wallet cache** — the wallet may keep a history of connections.
+3. **Program not restarted** — the previous URI is still in memory.
 
-### Решение
+### Fix
 
-#### 1. Перезапустите программу для нового URI
-```bash
-cargo run --bin scapi-cli
-```
+#### 1. Restart the program to get a new URI
+Each run creates a **new unique** URI with a unique:
+- `symKey` (random 32 bytes)
+- `topic` (SHA256 hash of `symKey`)
+- `expiryTimestamp` (current time + 5 minutes)
 
-Каждый запуск создает **новый уникальный** URI с уникальным:
-- `symKey` (случайные 32 байта)
-- `topic` (SHA256 hash от symKey)
-- `expiryTimestamp` (текущее время + 5 минут)
+#### 2. Clear the wallet cache
+**In Qubic Wallet:**
+1. Open settings
+2. Find the “WalletConnect” / “Connections” section
+3. Delete all old sessions
+4. Or restart the wallet
 
-#### 2. Очистите кэш в кошельке
+#### 3. Verify the connection is unique
+The program prints a unique connection ID:
 
-**В Qubic Wallet:**
-1. Откройте настройки
-2. Найдите раздел "WalletConnect" или "Подключения"
-3. Удалите все старые сессии
-4. Или перезапустите кошелек
+🆔 Connection unique ID: `e10bf2f3a1c3b1bd656d3d0100b642ec...`
 
-#### 3. Проверьте уникальность подключения
+Make sure the ID is **different** every time.
 
-Программа показывает уникальный ID:
-```
-🆔 Уникальный ID подключения: e10bf2f3a1c3b1bd656d3d0100b642ec...
-```
+## Error: “Invalid URL”
 
-Убедитесь, что каждый раз ID **разный**.
+### Causes
+1. **Wrong URI format** — must match WalletConnect v2.
+2. **Missing required parameters**
+3. **Wrong parameter order**
 
----
+### Fix
+The URI must look like:
 
-## Ошибка: "Неверный URL"
+`wc:<topic>@2?expiryTimestamp=<unix>&relay-protocol=irn&symKey=<hex>`
 
-### Причины
-1. **Неправильный формат URI** - должен соответствовать WalletConnect v2
-2. **Отсутствуют обязательные параметры**
-3. **Неправильный порядок параметров**
+**Parameter order matters:**
+1. `expiryTimestamp` — first
+2. `relay-protocol` — second
+3. `symKey` — third
 
-### Решение
+**Wallet deep link:**
+`qubic-wallet://wc?uri=<encoded_wc_uri>`
 
-URI должен иметь формат:
-```
-wc:<topic>@2?expiryTimestamp=<timestamp>&relay-protocol=irn&symKey=<key>
-```
+## Connection timeout
 
-**Порядок параметров важен:**
-1. `expiryTimestamp` - первый
-2. `relay-protocol` - второй
-3. `symKey` - третий
+### Causes
+1. **QR code wasn’t scanned** within 120 seconds
+2. **Network issues** — no internet
+3. **Wallet does not support WalletConnect v2**
 
-**Deep link для кошелька:**
-```
-qubic-wallet://pairwc/wc:<topic>@2?...
-```
+### Fix
+1. **Scan the QR faster** — you have 120 seconds
+2. **Check internet** on both phone and computer
+3. **Update the wallet** to the latest version
+4. **Use a deep link** instead of a QR code:
 
----
+`qubic-wallet://wc?uri=<encoded_wc_uri>`
 
-## Таймаут подключения
+## Project ID problems
 
-### Причины
-1. **QR-код не был отсканирован** в течение 120 секунд
-2. **Проблемы с сетью** - нет интернета
-3. **Кошелек не поддерживает WalletConnect v2**
+### Symptoms
+- Connection is never established
+- Initialization errors
 
-### Решение
-
-1. **Сканируйте QR быстрее** - у вас есть 120 секунд
-2. **Проверьте интернет** на телефоне и компьютере
-3. **Обновите кошелек** до последней версии
-4. **Используйте deep link** вместо QR-кода:
-   ```
-   qubic-wallet://pairwc/wc:...
-   ```
-
----
-
-## Проблемы с Project ID
-
-### Симптомы
-- Подключение не устанавливается
-- Ошибки инициализации
-
-### Решение
-
-1. **Получите свой Project ID** на https://cloud.walletconnect.com/
-2. **Установите переменную окружения:**
-   ```bash
-   # Windows PowerShell
-   $env:WALLET_CONNECT_PROJECT_ID="your_project_id"
-   
-   # Linux/Mac
-   export WALLET_CONNECT_PROJECT_ID="your_project_id"
-   ```
-3. **Проверьте, что Project ID активен** в панели WalletConnect
-
----
-
-## Отладка
-
-### Включите debug логирование
-```bash
-# Windows PowerShell
-$env:RUST_LOG="debug"
-cargo run --bin scapi-cli
-
-# Linux/Mac
-RUST_LOG=debug cargo run --bin scapi-cli
-```
-
-### Проверьте генерируемые значения
-В debug режиме вы увидите:
-```
-Generated symKey: 1c66ce5bbdda58c1e56a18c093b2d416...
-Calculated topic: e10bf2f3a1c3b1bd656d3d0100b642ec...
-Expiry timestamp: 1761983605
-```
-
-Убедитесь, что:
-- ✅ `symKey` - 64 символа (32 байта в hex)
-- ✅ `topic` - 64 символа (SHA256 hash)
-- ✅ `expiryTimestamp` - unix timestamp
-
----
-
-## Контакты и поддержка
-
-- **Документация WalletConnect:** https://docs.walletconnect.com/
-- **Документация Reown:** https://docs.reown.com/
-- **Qubic Wallet API:** https://github.com/qubic/wallet-app/blob/main/walletconnect.md
-
----
-
-## Полезные команды
+### Fix
+1. **Get your Project ID** at https://cloud.walletconnect.com/
+2. **Set an environment variable:**
 
 ```bash
-# Запуск с debug логами
-RUST_LOG=debug cargo run --bin scapi-cli
+set WALLETCONNECT_PROJECT_ID=your_project_id
+```
 
-# Сборка release версии (быстрее)
-cargo build --release --bin scapi-cli
-./target/release/scapi-cli
+3. **Verify the Project ID is active** in the WalletConnect Cloud dashboard
 
-# Очистка и пересборка
+## Debugging
+
+### Enable debug logging
+
+```bash
+set RUST_LOG=debug
+cargo run
+```
+
+### Inspect generated values
+In debug mode you should see:
+- `symKey` — 64 hex chars (32 bytes)
+- `topic` — 64 hex chars (SHA256 hash)
+
+## Contacts and support
+- WalletConnect docs: https://docs.walletconnect.com/
+- Reown docs: https://docs.reown.com/
+
+## Useful commands
+
+```bash
+# Run with debug logs
+set RUST_LOG=debug
+cargo run
+
+# Release build (faster)
+cargo build --release
+
+# Clean and rebuild
 cargo clean
-cargo build --bin scapi-cli
+cargo build
 
-# Запуск примеров
+# Run examples
 cargo run --example wallet_connect_basic
-cargo run --example wallet_connect_transaction
 ```
-
