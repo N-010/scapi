@@ -228,7 +228,7 @@ impl WalletConnectClient {
         };
 
         // Log SessionPropose before encryption for debugging
-        println!("\n=== [WalletConnect] ДЕТАЛИ SessionPropose (ДО шифрования) ===\n");
+        println!("\n=== [WalletConnect] SessionPropose DETAILS (BEFORE encryption) ===\n");
         println!("[WalletConnect] Pairing topic: {}", topic);
         println!("[WalletConnect] Proposer public key: {}", public_key_hex);
         println!("[WalletConnect] Expiry timestamp: {}", expiry_timestamp);
@@ -243,7 +243,7 @@ impl WalletConnectClient {
         match serde_json::to_string_pretty(&session_propose) {
             Ok(json) => {
                 tracing::debug!("[WalletConnect] SessionPropose JSON:\n{}", json);
-                println!("[WalletConnect] Полный SessionPropose JSON:\n{}", json);
+                println!("[WalletConnect] Full SessionPropose JSON:\n{}", json);
             }
             Err(e) => {
                 tracing::warn!("[WalletConnect] Failed to serialize SessionPropose: {}", e);
@@ -299,9 +299,9 @@ impl WalletConnectClient {
             public_key_hex,
             expiry_timestamp
         );
-        println!("\n=== [WalletConnect] ОТПРАВКА SessionPropose ===\n");
-        println!("[WalletConnect] 📤 Отправка SessionPropose на topic: {}", topic);
-        println!("[WalletConnect] 📤 Параметры: irn_tag={:?}, ttl={}", irn_tag, ttl);
+        println!("\n=== [WalletConnect] SENDING SessionPropose ===\n");
+        println!("[WalletConnect] 📤 Sending SessionPropose on topic: {}", topic);
+        println!("[WalletConnect] 📤 Params: irn_tag={:?}, ttl={}", irn_tag, ttl);
         println!("[WalletConnect] 📤 Proposer public key: {}", public_key_hex);
         println!("[WalletConnect] 📤 Expiry timestamp: {}", expiry_timestamp);
         
@@ -322,12 +322,12 @@ impl WalletConnectClient {
             .await
         {
             Ok(_) => {
-                println!("[WalletConnect] ✅ SessionPropose ОТПРАВЛЕН на relay сервер!");
-                println!("[WalletConnect] ⏳ Ожидание ответа от кошелька на topic: {}", topic);
+                println!("[WalletConnect] ✅ SessionPropose sent to relay server!");
+                println!("[WalletConnect] ⏳ Waiting for wallet response on topic: {}", topic);
                 eprintln!("[WalletConnect DEBUG] Published successfully to relay");
             }
             Err(e) => {
-                println!("[WalletConnect] ❌ ОШИБКА отправки SessionPropose: {:?}", e);
+                println!("[WalletConnect] ❌ ERROR sending SessionPropose: {:?}", e);
                 eprintln!("[WalletConnect ERROR] Failed to publish: {:?}", e);
                 return Err(map_sdk_error(e));
             }
@@ -361,14 +361,14 @@ impl WalletConnectClient {
 
         *self.connection_url.lock().unwrap() = uri.clone();
 
-        println!("\n=== [WalletConnect] URI СГЕНЕРИРОВАН ===\n");
+        println!("\n=== [WalletConnect] URI GENERATED ===\n");
         println!("[WalletConnect] ✅ Connection URI generated successfully");
         println!("[WalletConnect] 🔑 Pairing topic: {}", topic);
         println!("[WalletConnect] ⏰ Expiry: {} (expires in 5 minutes)", expiry_timestamp);
         println!("[WalletConnect] 🔐 SymKey (hex): {}", sym_key_hex);
         println!("[WalletConnect] 📋 Full URI:");
         println!("   {}", uri);
-        println!("\n=== [WalletConnect] ОТПРАВКА SessionPropose ===\n");
+        println!("\n=== [WalletConnect] SESSION PROPOSAL SENT ===\n");
         tracing::info!("[WalletConnect] ✅ Connection URI generated successfully");
         tracing::info!("[WalletConnect] 🔑 Pairing topic: {}", topic);
 
@@ -883,9 +883,14 @@ async fn process_topic(
         .map_err(map_sdk_error)?;
 
     if !messages.is_empty() {
-        println!("[WalletConnect] 📬 ПОЛУЧЕНО {} сообщений на topic {} (kind: {:?})", messages.len(), topic, kind);
+        println!(
+            "[WalletConnect] 📬 Received {} messages on topic {} (kind: {:?})",
+            messages.len(),
+            topic,
+            kind
+        );
     } else if kind == TopicKind::Initial {
-        // Логируем только для initial topic чтобы не спамить
+        // Log only for the initial topic to avoid spamming
         tracing::debug!("[WalletConnect] No messages on topic {} (kind: {:?})", topic, kind);
     }
 
@@ -923,13 +928,16 @@ async fn handle_message(
     session_store: &Arc<Mutex<Option<Session>>>,
     connection_sender: &Arc<Mutex<Option<tokio::sync::oneshot::Sender<bool>>>>,
 ) -> WalletConnectResult<()> {
-    let topic = &encrypted.topic; // Получаем topic из encrypted сообщения
+    let topic = &encrypted.topic; // Get topic from encrypted message
     let decrypted =
         WcRawMessage::decrypt(&encrypted.message, sym_key, None).map_err(map_sdk_error)?;
     let decoded = decrypted.clone().decode().map_err(map_sdk_error)?;
 
     let method_name = decoded.data.method();
-    println!("[WalletConnect] 📨 ПОЛУЧЕНО СООБЩЕНИЕ от кошелька: {:?} на topic {} (kind: {:?})", method_name, topic, kind);
+    println!(
+        "[WalletConnect] 📨 Received message from wallet: {:?} on topic {} (kind: {:?})",
+        method_name, topic, kind
+    );
     tracing::info!(
         "[WalletConnect] 📨 Received message: {:?} on topic {} (kind: {:?})",
         method_name,
@@ -1004,11 +1012,11 @@ async fn handle_message(
                 derived_topic
             );
             println!(
-                "[WalletConnect] ✅ Подписались на derived topic: {}",
+                "[WalletConnect] ✅ Subscribed to derived topic: {}",
                 derived_topic
             );
             println!(
-                "[WalletConnect] ⏳ Ожидание SessionSettle от кошелька на derived topic..."
+                "[WalletConnect] ⏳ Waiting for SessionSettle from wallet on derived topic..."
             );
 
             {
@@ -1123,7 +1131,10 @@ async fn handle_message(
             );
             tracing::error!(
                 "[WalletConnect] This error message suggests: {}",
-                if message.contains("already") || message.contains("установлено") || message.contains("established") {
+                if message.contains("already")
+                    || message.contains("established")
+                    || message.contains("via this URL")
+                {
                     "Wallet sees an existing connection. Check if old pairing/session needs to be deleted."
                 } else {
                     "Wallet rejected the connection request for unknown reason."

@@ -1,9 +1,9 @@
-/// Пример отправки транзакции через WalletConnect
+/// Example of sending a transaction via WalletConnect
 ///
-/// Этот пример показывает:
-/// - Подключение к кошельку
-/// - Запрос аккаунтов
-/// - Создание и отправку транзакции
+/// This example demonstrates:
+/// - Connecting to a wallet
+/// - Requesting accounts
+/// - Creating and sending a transaction
 use scapi::wallet_connect::*;
 use std::io::{self, Write};
 
@@ -11,13 +11,13 @@ use std::io::{self, Write};
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt::init();
 
-    println!("💸 WalletConnect для Qubic - Отправка транзакции");
+    println!("💸 WalletConnect for Qubic - Send transaction");
     println!("================================================\n");
 
-    // Настройка клиента
+    // Client setup
     let metadata = ClientMetadata {
         name: "Qubic Transaction Example".to_string(),
-        description: "Пример отправки транзакции через WalletConnect".to_string(),
+        description: "Example: send a transaction via WalletConnect".to_string(),
         url: "https://qubic.org".to_string(),
         icons: vec!["https://qx.qubic.org/assets/icons/favicon.ico".to_string()],
     };
@@ -28,45 +28,45 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut client = WalletConnectClient::new(config);
 
-    // Инициализация
-    println!("🔧 Инициализация клиента...");
+    // Initialize
+    println!("🔧 Initializing client...");
     client.init().await?;
-    println!("✅ Клиент готов к работе\n");
+    println!("✅ Client is ready\n");
 
-    // Генерация QR
-    println!("📱 Генерация QR-кода...");
+    // Generate QR/URI
+    println!("📱 Generating QR URI...");
     let uri = client.connect().await?;
-    println!("✅ Отсканируйте QR-код:");
+    println!("✅ Scan this QR code:");
     println!("   {}\n", uri);
 
-    println!("⏳ Ожидание подключения...");
-    // В реальном приложении здесь будет ожидание события подключения
+    println!("⏳ Waiting for connection...");
+    // In a real app, you would wait for the session approval event here.
 
-    // Симуляция успешного подключения
+    // Simulated check: in real usage, the session would become active after approval.
     if !client.is_session_active() {
-        println!("⚠️  Для выполнения транзакции необходимо подключение к кошельку");
+        println!("⚠️  A wallet connection is required to send a transaction");
         return Ok(());
     }
 
-    // Запрос аккаунтов
-    println!("\n📋 Запрос списка аккаунтов...");
+    // Request accounts
+    println!("\n📋 Requesting accounts...");
     match client.request_accounts().await {
         Ok(accounts) => {
-            println!("✅ Найдено аккаунтов: {}", accounts.len());
+            println!("✅ Accounts found: {}", accounts.len());
             for (i, account) in accounts.iter().enumerate() {
                 println!("   {}. {}", i + 1, account.address);
                 if let Some(balance) = account.amount {
-                    println!("      Баланс: {} Qubic", balance);
+                    println!("      Balance: {} Qubic", balance);
                 }
             }
 
             if accounts.is_empty() {
-                println!("⚠️  Нет доступных аккаунтов");
+                println!("⚠️  No accounts available");
                 return Ok(());
             }
 
-            // Создание транзакции
-            println!("\n💰 Создание транзакции...");
+            // Build transaction
+            println!("\n💰 Building transaction...");
 
             let from = accounts[0].address.clone();
             let to = get_recipient_address()?;
@@ -81,51 +81,51 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 payload: None,
             };
 
-            println!("\n📄 Параметры транзакции:");
-            println!("   От:    {}", from);
-            println!("   Кому:  {}", to);
-            println!("   Сумма: {} Qubic", amount);
+            println!("\n📄 Transaction parameters:");
+            println!("   From:   {}", from);
+            println!("   To:     {}", to);
+            println!("   Amount: {} Qubic", amount);
 
-            // Подтверждение
-            print!("\n❓ Отправить транзакцию? (y/n): ");
+            // Confirm
+            print!("\n❓ Send transaction? (y/n): ");
             io::stdout().flush()?;
             let mut confirm = String::new();
             io::stdin().read_line(&mut confirm)?;
 
             if confirm.trim().to_lowercase() != "y" {
-                println!("❌ Транзакция отменена");
+                println!("❌ Transaction cancelled");
                 return Ok(());
             }
 
-            // Отправка транзакции
-            println!("\n🚀 Отправка транзакции...");
-            println!("   (Подтвердите транзакцию в вашем кошельке)");
+            // Send transaction
+            println!("\n🚀 Sending transaction...");
+            println!("   (Approve the transaction in your wallet)");
 
             match client.send_transaction(tx_params).await {
                 Ok(result) => {
-                    println!("✅ Транзакция успешно отправлена!");
-                    println!("   Результат: {:?}", result);
+                    println!("✅ Transaction sent successfully!");
+                    println!("   Result: {:?}", result);
                 }
                 Err(e) => {
-                    println!("❌ Ошибка отправки транзакции: {}", e);
+                    println!("❌ Failed to send transaction: {}", e);
                 }
             }
         }
         Err(e) => {
-            println!("❌ Ошибка получения аккаунтов: {}", e);
+            println!("❌ Failed to request accounts: {}", e);
         }
     }
 
-    // Отключение
-    println!("\n🔌 Отключение от кошелька...");
+    // Disconnect
+    println!("\n🔌 Disconnecting from wallet...");
     client.disconnect().await?;
-    println!("✅ Отключено");
+    println!("✅ Disconnected");
 
     Ok(())
 }
 
 fn get_recipient_address() -> Result<String, Box<dyn std::error::Error>> {
-    print!("\n📬 Введите адрес получателя: ");
+    print!("\n📬 Enter recipient address: ");
     io::stdout().flush()?;
     let mut address = String::new();
     io::stdin().read_line(&mut address)?;
@@ -133,7 +133,7 @@ fn get_recipient_address() -> Result<String, Box<dyn std::error::Error>> {
 }
 
 fn get_amount() -> Result<u64, Box<dyn std::error::Error>> {
-    print!("💵 Введите сумму (в минимальных единицах): ");
+    print!("💵 Enter amount (in smallest units): ");
     io::stdout().flush()?;
     let mut amount = String::new();
     io::stdin().read_line(&mut amount)?;

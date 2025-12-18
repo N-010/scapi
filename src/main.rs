@@ -15,88 +15,88 @@ use wallet_connect::*;
 #[cfg(not(target_arch = "wasm32"))]
 #[tokio::main]
 async fn main() -> Result<()> {
-        // Инициализация логирования с DEBUG уровнем для детальной диагностики
+    // Initialize logging with DEBUG level for detailed diagnostics
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::DEBUG)
         .init();
 
     println!("╔════════════════════════════════════════════════════════════╗");
-    println!("║  🔗 WalletConnect для Qubic - Подключение по QR-коду      ║");
+    println!("║  🔗 WalletConnect for Qubic - QR connection               ║");
     println!("╚════════════════════════════════════════════════════════════╝\n");
 
-    // Шаг 1: Конфигурация
-    println!("📝 Шаг 1: Создание конфигурации WalletConnect...");
+    // Step 1: Configuration
+    println!("📝 Step 1: Creating WalletConnect configuration...");
 
     let project_id = std::env::var("WALLET_CONNECT_PROJECT_ID")
         .unwrap_or_else(|_| {
-            println!("⚠️  Переменная WALLET_CONNECT_PROJECT_ID не установлена");
-            println!("   Используйте: export WALLET_CONNECT_PROJECT_ID=your_project_id");
-            println!("   Или получите ID на: https://cloud.walletconnect.com/\n");
+            println!("⚠️  WALLET_CONNECT_PROJECT_ID is not set");
+            println!("   Use: set WALLET_CONNECT_PROJECT_ID=your_project_id");
+            println!("   Or get a Project ID at: https://cloud.walletconnect.com/\n");
             "demo_project_id".to_string()
         });
 
     let config = WalletConnectConfig::new(project_id.clone(), "qubic:mainnet".to_string());
 
-    println!("✅ Конфигурация создана");
+    println!("✅ Configuration created");
     println!(
         "   Project ID: {}",
         if project_id == "demo_project_id" {
-            "demo_project_id (замените на реальный!)"
+            "demo_project_id (replace with a real one!)"
         } else {
             &project_id
         }
     );
     println!("   Chain ID: qubic:mainnet\n");
 
-    // Шаг 2: Создание клиента
-    println!("🔧 Шаг 2: Создание WalletConnect клиента...");
+    // Step 2: Create client
+    println!("🔧 Step 2: Creating WalletConnect client...");
     let mut client = WalletConnectClient::new(config);
-    println!("✅ Клиент создан\n");
+    println!("✅ Client created\n");
 
-    // Шаг 3: Инициализация
-    println!("🔌 Шаг 3: Инициализация клиента...");
+    // Step 3: Initialize
+    println!("🔌 Step 3: Initializing client...");
     match client.init().await {
-        Ok(_) => println!("✅ Клиент инициализирован успешно\n"),
+        Ok(_) => println!("✅ Client initialized successfully\n"),
         Err(e) => {
-            println!("❌ Ошибка инициализации: {}\n", e);
+            println!("❌ Initialization error: {}\n", e);
             return Ok(());
         }
     }
 
-    // Шаг 4: Генерация URI для QR-кода
-    println!("📱 Шаг 4: Генерация URI для QR-кода...");
-    println!("   ℹ️  Старые сессии автоматически очищаются");
-    println!("   ℹ️  Каждый запуск создает НОВЫЙ уникальный URI для подключения");
-    println!("   ℹ️  Это предотвращает ошибки 'соединение уже установлено'\n");
+    // Step 4: Generate URI for QR
+    println!("📱 Step 4: Generating URI for QR...");
+    println!("   ℹ️  Old sessions/state are cleaned up automatically");
+    println!("   ℹ️  Each run generates a NEW unique URI");
+    println!("   ℹ️  This helps avoid 'connection already established' errors\n");
 
     let uri = match client.connect().await {
         Ok(uri) => {
-            println!("✅ URI сгенерирован успешно\n");
+            println!("✅ URI generated successfully\n");
             println!(
-                "   🆔 Уникальный ID подключения: {}\n",
+                "   🆔 Unique connection ID: {}\n",
                 uri.split('@').next().unwrap_or("").replace("wc:", "")
             );
             uri
         }
         Err(e) => {
-            println!("❌ Ошибка генерации URI: {}\n", e);
+            println!("❌ Failed to generate URI: {}\n", e);
             return Ok(());
         }
     };
 
-    // Отображение QR-кода в консоли
+    // Render QR code in the console (debug builds)
     println!("╔════════════════════════════════════════════════════════════╗");
-    println!("║                    QR КОД ДЛЯ СКАНИРОВАНИЯ                 ║");
+    println!("║                    QR CODE TO SCAN                         ║");
     println!("╚════════════════════════════════════════════════════════════╝\n");
 
-    // Попытка отобразить QR-код в консоли
+    // Try to render a QR code in the console
     #[cfg(debug_assertions)]
     {
         match qr2term::print_qr(&uri) {
-            Ok(_) => println!("\n✅ QR-код отображен выше ⬆️\n"),
+            Ok(_) => println!("\n✅ QR code rendered above ⬆️\n"),
             Err(_) => {
-                println!("⚠️  Не удалось отобразить QR-код в консоли\n");
-                println!("📋 URI для ручного ввода или генерации QR:");
+                println!("⚠️  Failed to render QR code in the console\n");
+                println!("📋 URI (use it to generate a QR code externally):");
                 println!("   {}\n", uri);
             }
         }
@@ -108,30 +108,30 @@ async fn main() -> Result<()> {
         println!("   {}\n", uri);
     }
 
-    // Инструкции для пользователя
+    // User instructions
     println!("╔════════════════════════════════════════════════════════════╗");
-    println!("║                   КАК ПОДКЛЮЧИТЬСЯ                         ║");
+    println!("║                   HOW TO CONNECT                           ║");
     println!("╚════════════════════════════════════════════════════════════╝");
-    println!("\n1️⃣  Откройте ваш Qubic кошелек на телефоне");
-    println!("2️⃣  Найдите функцию WalletConnect");
-    println!("3️⃣  Отсканируйте QR-код выше");
-    println!("4️⃣  Подтвердите подключение в кошельке\n");
+    println!("\n1️⃣  Open your Qubic wallet on your phone");
+    println!("2️⃣  Find WalletConnect");
+    println!("3️⃣  Scan the QR code above");
+    println!("4️⃣  Approve the connection in the wallet\n");
 
-    // Дополнительная информация
-    println!("💡 Для deep link используйте:");
+    // Extra info
+    println!("💡 Deep link:");
     println!("   qubic-wallet://pairwc/{}\n", uri);
-    println!("💡 Для QR-кода онлайн:");
+    println!("💡 Online QR generator:");
     println!("   https://www.qr-code-generator.com/\n");
 
-    // Ожидание подключения кошелька с анимацией
+    // Wait for wallet connection with a small animation
     println!("╔════════════════════════════════════════════════════════════╗");
-    println!("║              ⏳ ОЖИДАНИЕ ПОДКЛЮЧЕНИЯ КОШЕЛЬКА              ║");
+    println!("║              ⏳ WAITING FOR WALLET CONNECTION              ║");
     println!("╚════════════════════════════════════════════════════════════╝\n");
 
-    println!("   Отсканируйте QR-код в вашем Qubic кошельке");
-    println!("   Таймаут: 120 секунд (2 минуты)\n");
+    println!("   Scan the QR code in your Qubic wallet");
+    println!("   Timeout: 120 seconds (2 minutes)\n");
 
-    // Анимация ожидания в отдельной задаче
+    // Waiting animation in a separate task
     let animation_handle = tokio::spawn(async {
         let mut dots = 0;
         let start = tokio::time::Instant::now();
@@ -148,7 +148,7 @@ async fn main() -> Result<()> {
             let spaces_str = " ".repeat(3 - dots);
 
             print!(
-                "\r   ⏳ Ожидание{}{} (осталось: {}с)    ",
+                "\r   ⏳ Waiting{}{} (remaining: {}s)    ",
                 dots_str, spaces_str, remaining
             );
             std::io::Write::flush(&mut std::io::stdout()).ok();
@@ -157,31 +157,31 @@ async fn main() -> Result<()> {
         }
     });
 
-    // Ожидание подключения с timeout 120 секунд
+    // Wait for connection with a 120-second timeout
     let connection_result = client.wait_for_connection(120).await;
 
-    // Останавливаем анимацию
+    // Stop animation
     animation_handle.abort();
     println!("\r                                                              \r");
 
-    // Обработка результата подключения
+    // Handle connection result
     match connection_result {
         Ok(true) => {
             println!("╔════════════════════════════════════════════════════════════╗");
-            println!("║              ✅ КОШЕЛЕК УСПЕШНО ПОДКЛЮЧЕН!                 ║");
+            println!("║              ✅ WALLET CONNECTED SUCCESSFULLY!             ║");
             println!("╚════════════════════════════════════════════════════════════╝\n");
 
             if let Some(session) = client.get_session() {
-                println!("📊 Информация о сессии:");
+                println!("📊 Session info:");
                 println!("   Topic: {}", session.topic);
                 if let Some(ttl) = session.time_until_expiry() {
-                    println!("   Истекает через: {} часов", ttl / 3600);
+                    println!("   Expires in: {} hours", ttl / 3600);
                 }
                 println!("   Relay protocol: {}", session.relay_protocol);
-                println!("   Статус: Активна ✅\n");
+                println!("   Status: Active ✅\n");
             }
 
-            println!("💡 Дальше вы можете использовать методы клиента вручную:");
+            println!("💡 Next, you can use the client methods manually:");
             println!("   • client.request_accounts()");
             println!("   • client.sign_message(...)");
             println!("   • client.send_transaction(...)");
@@ -189,46 +189,46 @@ async fn main() -> Result<()> {
         }
         Ok(false) => {
             println!("╔════════════════════════════════════════════════════════════╗");
-            println!("║              ❌ ПОДКЛЮЧЕНИЕ ОТКЛОНЕНО                      ║");
+            println!("║              ❌ CONNECTION REJECTED                        ║");
             println!("╚════════════════════════════════════════════════════════════╝\n");
-            println!("   Подключение было отклонено в кошельке\n");
+            println!("   The connection was rejected in the wallet\n");
         }
         Err(e) => {
             println!("╔════════════════════════════════════════════════════════════╗");
-            println!("║              ⏰ ТАЙМАУТ ОЖИДАНИЯ                           ║");
+            println!("║              ⏰ CONNECTION TIMEOUT                          ║");
             println!("╚════════════════════════════════════════════════════════════╝\n");
-            println!("   Ошибка: {}\n", e);
-            println!("   Возможные причины:");
-            println!("   • QR-код не был отсканирован");
-            println!("   • Подключение было отклонено в кошельке");
-            println!("   • Истек таймаут ожидания (120 сек)\n");
+            println!("   Error: {}\n", e);
+            println!("   Possible reasons:");
+            println!("   • QR code was not scanned");
+            println!("   • Connection was rejected in the wallet");
+            println!("   • Timeout expired (120s)\n");
 
-            println!("💡 Попробуйте:");
-            println!("   • Запустите программу снова: cargo run");
-            println!("   • Проверьте Project ID в переменной окружения");
-            println!("   • Убедитесь, что кошелек поддерживает WalletConnect\n");
+            println!("💡 Try:");
+            println!("   • Run again: cargo run");
+            println!("   • Check Project ID in the environment variable");
+            println!("   • Ensure the wallet supports WalletConnect\n");
         }
     }
 
-    // Информация о дальнейших действиях
+    // Next steps
     println!("╔════════════════════════════════════════════════════════════╗");
-    println!("║                  ДАЛЬНЕЙШИЕ ДЕЙСТВИЯ                       ║");
+    println!("║                  NEXT STEPS                                ║");
     println!("╚════════════════════════════════════════════════════════════╝\n");
 
-    println!("📚 Изучите документацию:");
-    println!("   - WALLET_CONNECT_QUICKSTART.md - быстрый старт");
-    println!("   - WALLET_CONNECT_API.md - полная документация");
-    println!("   - examples/ - готовые примеры\n");
+    println!("📚 Read the docs:");
+    println!("   - WALLET_CONNECT_QUICKSTART.md - quick start");
+    println!("   - WALLET_CONNECT_API.md - full API docs");
+    println!("   - examples/ - ready-to-run examples\n");
 
-    println!("🧪 Запустите примеры:");
+    println!("🧪 Run examples:");
     println!("   cargo run --example wallet_connect_basic");
     println!("   cargo run --example wallet_connect_transaction");
     println!("   cargo run --example wallet_connect_events\n");
 
-    println!("🌐 Для использования в браузере:");
+    println!("🌐 For browser usage:");
     println!("   wasm-pack build --target web\n");
 
-    println!("✨ Готово! Проект SCAPI с WalletConnect API готов к использованию!");
+    println!("✨ Done! SCAPI WalletConnect API is ready to use!");
 
     Ok(())
 }

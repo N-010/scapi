@@ -1,57 +1,57 @@
 use scapi::wallet_connect::events::*;
-/// Пример обработки событий WalletConnect
+/// WalletConnect event handling example
 ///
-/// Этот пример показывает:
-/// - Регистрацию обработчиков событий
-/// - Реагирование на различные события WalletConnect
-/// - Управление жизненным циклом сессии
+/// This example demonstrates:
+/// - Registering event handlers
+/// - Reacting to different WalletConnect events
+/// - Managing the session lifecycle
 use scapi::wallet_connect::*;
 
-// Кастомный обработчик событий
+// Custom event handler
 struct MyEventHandler {
     name: String,
 }
 
 impl EventCallback for MyEventHandler {
     fn on_event(&self, event: WalletConnectEvent, payload: serde_json::Value) {
-        println!("\n🔔 [{}] Событие получено:", self.name);
-        println!("   Тип: {:?}", event);
+        println!("\n🔔 [{}] Event received:", self.name);
+        println!("   Type: {:?}", event);
 
         match event {
             WalletConnectEvent::SessionProposal => {
-                println!("   📋 Предложение сессии");
-                println!("   Данные: {}", payload);
+                println!("   📋 Session proposal");
+                println!("   Payload: {}", payload);
             }
             WalletConnectEvent::SessionRequest => {
-                println!("   📨 Запрос сессии");
-                println!("   Данные: {}", payload);
+                println!("   📨 Session request");
+                println!("   Payload: {}", payload);
             }
             WalletConnectEvent::SessionDelete => {
-                println!("   🗑️  Сессия удалена");
-                println!("   Причина: {}", payload);
+                println!("   🗑️  Session deleted");
+                println!("   Reason: {}", payload);
             }
             WalletConnectEvent::SessionExpire => {
-                println!("   ⏰ Сессия истекла");
-                println!("   Детали: {}", payload);
+                println!("   ⏰ Session expired");
+                println!("   Details: {}", payload);
             }
             WalletConnectEvent::ProposalExpire => {
-                println!("   ⌛ Предложение истекло");
-                println!("   Детали: {}", payload);
+                println!("   ⌛ Proposal expired");
+                println!("   Details: {}", payload);
             }
             WalletConnectEvent::SessionEvent => {
-                println!("   🎉 Событие сессии");
-                println!("   Данные: {}", payload);
+                println!("   🎉 Session event");
+                println!("   Payload: {}", payload);
             }
             WalletConnectEvent::SessionUpdate => {
-                println!("   🔄 Обновление сессии");
-                println!("   Новые данные: {}", payload);
+                println!("   🔄 Session update");
+                println!("   New data: {}", payload);
             }
             WalletConnectEvent::SessionExtend => {
-                println!("   ⏭️  Продление сессии");
-                println!("   Детали: {}", payload);
+                println!("   ⏭️  Session extended");
+                println!("   Details: {}", payload);
             }
             WalletConnectEvent::SessionPing => {
-                println!("   🏓 Пинг сессии");
+                println!("   🏓 Session ping");
             }
         }
     }
@@ -61,52 +61,52 @@ impl EventCallback for MyEventHandler {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt::init();
 
-    println!("🎯 WalletConnect для Qubic - Обработка событий");
+    println!("🎯 WalletConnect for Qubic - Event handling");
     println!("==============================================\n");
 
-    // Создание конфигурации
+    // Create configuration
     let config =
         WalletConnectConfig::new("your_project_id".to_string(), "qubic:mainnet".to_string());
 
     let mut client = WalletConnectClient::new(config);
 
-    // Регистрация обработчиков событий
-    println!("📝 Регистрация обработчиков событий...");
+    // Register event handlers
+    println!("📝 Registering event handlers...");
 
-    // Логирующий обработчик (встроенный)
+    // Logging handler (built-in)
     client.event_handler().register(Box::new(LoggingCallback));
 
-    // Кастомный обработчик
+    // Custom handler
     client.event_handler().register(Box::new(MyEventHandler {
         name: "CustomHandler".to_string(),
     }));
 
-    println!("✅ Обработчики зарегистрированы\n");
+    println!("✅ Handlers registered\n");
 
-    // Инициализация
-    println!("🔧 Инициализация клиента...");
+    // Initialize
+    println!("🔧 Initializing client...");
     client.init().await?;
-    println!("✅ Клиент инициализирован\n");
+    println!("✅ Client initialized\n");
 
-    // Генерация URI
-    println!("📱 Генерация URI для подключения...");
+    // Generate URI
+    println!("📱 Generating connection URI...");
     let uri = client.connect().await?;
     println!("✅ URI: {}\n", uri);
 
-    println!("📲 Отсканируйте QR-код в кошельке для подключения");
-    println!("   События будут отображаться здесь...\n");
+    println!("📲 Scan the QR code in your wallet to connect");
+    println!("   Events will be printed here...\n");
 
-    // Имитация ожидания событий
-    println!("⏳ Ожидание событий (нажмите Ctrl+C для выхода)...\n");
+    // Simulate waiting for events
+    println!("⏳ Waiting for events (press Ctrl+C to exit)...\n");
 
-    // В реальном приложении здесь был бы event loop
-    // Для демонстрации просто ждем немного
+    // In a real application there would be an event loop here.
+    // For the demo we just wait a bit.
     tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
 
-    // Симуляция некоторых событий для демонстрации
-    println!("\n🧪 Симуляция событий для демонстрации:");
+    // Simulate some events for demonstration
+    println!("\n🧪 Simulating events for demo:");
 
-    // Событие подключения
+    // Proposal event
     client.event_handler().emit(
         WalletConnectEvent::SessionProposal,
         serde_json::json!({
@@ -117,7 +117,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
-    // Событие обновления сессии
+    // Session update event
     client.event_handler().emit(
         WalletConnectEvent::SessionUpdate,
         serde_json::json!({
@@ -128,13 +128,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
-    // Отключение
-    println!("\n🔌 Отключение...");
+    // Disconnect
+    println!("\n🔌 Disconnecting...");
     client.disconnect().await?;
-    println!("✅ Отключено\n");
+    println!("✅ Disconnected\n");
 
-    println!("ℹ️  Пример завершен. В реальном приложении события будут");
-    println!("   приходить от подключенного кошелька автоматически.");
+    println!("ℹ️  Example finished. In a real app, events will");
+    println!("   arrive from the connected wallet automatically.");
 
     Ok(())
 }
