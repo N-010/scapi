@@ -6,6 +6,9 @@ use js_sys::{Promise, Uint8Array};
 use serde_wasm_bindgen::Serializer;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
+use qrcode::{render::svg, QrCode};
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::Engine as _;
 
 fn anyhow_to_js(err: anyhow::Error) -> JsValue {
     JsValue::from_str(&err.to_string())
@@ -191,6 +194,18 @@ pub fn query_smart_contract_async(request_bytes: Vec<u8>) -> Promise {
             Err(err) => Err(anyhow_to_js(err)),
         }
     })
+}
+
+#[wasm_bindgen(js_name = generateQRCode)]
+pub fn generate_qr_code(uri: String) -> Result<String, JsValue> {
+    let code = QrCode::new(uri.as_bytes())
+        .map_err(|e| JsValue::from_str(&format!("QR encode error: {}", e)))?;
+    let svg = code
+        .render::<svg::Color>()
+        .min_dimensions(256, 256)
+        .build();
+    let encoded = BASE64_STANDARD.encode(svg.as_bytes());
+    Ok(format!("data:image/svg+xml;base64,{}", encoded))
 }
 
 #[wasm_bindgen(js_name = ResponseDecoder)]

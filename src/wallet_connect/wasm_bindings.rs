@@ -1,6 +1,12 @@
 use serde::{Deserialize, Serialize};
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
+#[cfg(target_arch = "wasm32")]
+use qrcode::{render::svg, QrCode};
+#[cfg(target_arch = "wasm32")]
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+#[cfg(target_arch = "wasm32")]
+use base64::Engine as _;
 
 #[cfg(target_arch = "wasm32")]
 use crate::wallet_connect::{client::WalletConnectClient as NativeClient, types::*};
@@ -225,7 +231,12 @@ impl WalletConnectClient {
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen(js_name = generateQRCode)]
 pub fn generate_qr_code(uri: String) -> Result<String, JsValue> {
-    // This is a placeholder - in a real implementation, you'd use a QR code library
-    // For now, just return the URI that can be used with a JS QR code library
-    Ok(uri)
+    let code = QrCode::new(uri.as_bytes())
+        .map_err(|e| JsValue::from_str(&format!("QR encode error: {}", e)))?;
+    let svg = code
+        .render::<svg::Color>()
+        .min_dimensions(256, 256)
+        .build();
+    let encoded = BASE64_STANDARD.encode(svg.as_bytes());
+    Ok(format!("data:image/svg+xml;base64,{}", encoded))
 }
