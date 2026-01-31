@@ -19,7 +19,7 @@ use core::ptr::copy_nonoverlapping;
 #[inline(always)]
 pub fn addcarry_u64(c_in: u8, a: u64, b: u64, out: &mut u64) -> u8 {
     #[cfg(target_arch = "x86_64")]
-    unsafe {
+    {
         _addcarry_u64(c_in, a, b, out)
     }
 
@@ -37,7 +37,7 @@ pub fn addcarry_u64(c_in: u8, a: u64, b: u64, out: &mut u64) -> u8 {
 #[inline(always)]
 pub fn subborrow_u64(b_in: u8, a: u64, b: u64, out: &mut u64) -> u8 {
     #[cfg(target_arch = "x86_64")]
-    unsafe {
+    {
         _subborrow_u64(b_in, a, b, out)
     }
 

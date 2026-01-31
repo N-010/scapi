@@ -6,7 +6,7 @@ use tiny_keccak::{Hasher, IntoXof, KangarooTwelve, Xof};
 
 use crate::four_q::{
     consts::{CURVE_ORDER_0, CURVE_ORDER_1, CURVE_ORDER_2, CURVE_ORDER_3, MONTGOMERY_R_PRIME, ONE},
-    ops::{decode, ecc_mul, ecc_mul_double, ecc_mul_fixed, encode, montgomery_multiply_mod_order},
+    ops::{decode, ecc_mul_double, ecc_mul_fixed, encode, montgomery_multiply_mod_order},
     types::PointAffine,
 };
 
@@ -14,7 +14,7 @@ use super::{errors::QubicError, traits::ToBytes, QubicId, QubicWallet, Signature
 
 fn addcarry_u64(c_in: u8, a: u64, b: u64, out: &mut u64) -> u8 {
     #[cfg(target_arch = "x86_64")]
-    unsafe {
+    {
         _addcarry_u64(c_in, a, b, out)
     }
 
@@ -31,7 +31,7 @@ fn addcarry_u64(c_in: u8, a: u64, b: u64, out: &mut u64) -> u8 {
 
 fn subborrow_u64(b_in: u8, a: u64, b: u64, out: &mut u64) -> u8 {
     #[cfg(target_arch = "x86_64")]
-    unsafe {
+    {
         _subborrow_u64(b_in, a, b, out)
     }
 
