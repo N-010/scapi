@@ -127,6 +127,37 @@ pub fn build_signed_transaction_bytes_from_seed(
     build_signed_transaction_bytes(params, &wallet)
 }
 
+pub fn build_ticket_tx_bytes_from_seed(
+    seed: &str,
+    to: QubicId,
+    amount: u64,
+    tick: u32,
+    input_type: u16,
+    payload: Vec<u8>,
+) -> TransactionResult<Vec<u8>> {
+    let wallet = QubicWallet::from_seed(seed)?;
+    let params = TransactionParams::new(wallet.public_key, to, amount)
+        .with_tick(tick)
+        .with_input_type(input_type)
+        .with_payload(payload);
+    build_signed_transaction_bytes(&params, &wallet)
+}
+
+pub fn build_ticket_tx_bytes(
+    wallet: &QubicWallet,
+    to: QubicId,
+    amount: u64,
+    tick: u32,
+    input_type: u16,
+    payload: Vec<u8>,
+) -> TransactionResult<Vec<u8>> {
+    let params = TransactionParams::new(wallet.public_key, to, amount)
+        .with_tick(tick)
+        .with_input_type(input_type)
+        .with_payload(payload);
+    build_signed_transaction_bytes(&params, wallet)
+}
+
 fn ensure_payload_size(payload: &[u8]) -> TransactionResult<()> {
     if payload.len() > u16::MAX as usize {
         return Err(TransactionError::PayloadTooLarge {
