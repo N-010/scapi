@@ -1,5 +1,5 @@
 pub mod rpc;
-mod sc_api;
+pub mod sc_api;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod wallet_connect;
 
