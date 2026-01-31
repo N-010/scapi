@@ -2,50 +2,8 @@
 
 use anyhow::{anyhow, Result};
 use base64::{engine::general_purpose::STANDARD, Engine as _};
-use reqwest::Client;
-use serde::{Deserialize, Serialize};
 use serde_json::Value;
-
-use std::borrow::Cow;
-#[cfg(not(target_arch = "wasm32"))]
-use std::env;
-
-const DEFAULT_QUBIC_RPC_QUERY_SMART_CONTRACT: &str = "https://rpc.qubic.org/live/v1/querySmartContract";
-
-#[derive(Debug, Serialize)]
-struct QueryRequest<'a> {
-    #[serde(rename = "contractIndex")]
-    contract_index: u32,
-    #[serde(rename = "inputType")]
-    input_type: u32,
-    #[serde(rename = "inputSize")]
-    input_size: u32,
-    #[serde(rename = "requestData")]
-    request_data: &'a str,
-}
-
-#[derive(Debug, Deserialize)]
-struct QueryResponsePossible {
-    #[serde(rename = "responseData")]
-    response_data: Option<String>,
-    data: Option<String>,
-    result: Option<Value>,
-}
-
-fn qubic_rpc_query_endpoint() -> Cow<'static, str> {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        env::var("QUBIC_RPC_QUERY_SMART_CONTRACT")
-            .map(Cow::Owned)
-            .unwrap_or_else(|_| Cow::Borrowed(DEFAULT_QUBIC_RPC_QUERY_SMART_CONTRACT))
-    }
-    #[cfg(target_arch = "wasm32")]
-    {
-        option_env!("QUBIC_RPC_QUERY_SMART_CONTRACT")
-            .map(Cow::Borrowed)
-            .unwrap_or(Cow::Borrowed(DEFAULT_QUBIC_RPC_QUERY_SMART_CONTRACT))
-    }
-}
+use crate::rpc::post;
 
 /// Sends raw request bytes to Qubic RPC `querySmartContract` endpoint.
 ///
@@ -57,54 +15,13 @@ pub async fn query_smart_contract_with_meta(
     input_type: u32,
     request_bytes: &[u8],
 ) -> Result<Vec<u8>> {
-    let encoded = STANDARD.encode(request_bytes);
-    let payload = QueryRequest {
-        contract_index,
-        input_type,
-        input_size: request_bytes.len() as u32,
-        request_data: &encoded,
-    };
-
-    let client = Client::new();
-    let resp = client
-        .post(qubic_rpc_query_endpoint().as_ref())
-        .json(&payload)
-        .send()
-        .await?;
-
-    if !resp.status().is_success() {
-        return Err(anyhow!("RPC HTTP error: {}", resp.status()));
-    }
-
-    // Try structured parse first
-    let bytes = resp.bytes().await?;
-    let parsed: Result<QueryResponsePossible> = serde_json::from_slice(&bytes).map_err(Into::into);
-
-    if let Ok(body) = parsed {
-        if let Some(b64) = body.response_data.or(body.data) {
-            let decoded = STANDARD
-                .decode(b64.as_bytes())
-                .map_err(|e| anyhow!("Failed to decode base64 response: {}", e))?;
-            return Ok(decoded);
-        }
-        // Fallback: if `result` exists and is a string, try base64
-        if let Some(Value::String(s)) = body.result {
-            if let Ok(decoded) = STANDARD.decode(s.as_bytes()) {
-                return Ok(decoded);
-            }
-        }
-        // Otherwise return original JSON
-        return Ok(bytes.to_vec());
-    }
-
-    // If not JSON at all, return raw bytes
-    Ok(bytes.to_vec())
+    post::query_smart_contract_with_meta(contract_index, input_type, request_bytes).await
 }
 
 /// Backward-compatible helper that sends without metadata.
 /// Note: the API expects contractIndex/inputType/inputSize; this uses zeros which may be rejected.
 pub async fn query_smart_contract(request_bytes: &[u8]) -> Result<Vec<u8>> {
-    query_smart_contract_with_meta(0, 0, request_bytes).await
+    post::query_smart_contract(request_bytes).await
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -289,7 +206,7 @@ impl RequestDataBuilder {
     }
 
     pub async fn send(self) -> Result<Vec<u8>> {
-        query_smart_contract_with_meta(self.contract_index, self.input_type, &self.buffer).await
+        post::query_smart_contract_with_meta(self.contract_index, self.input_type, &self.buffer).await
     }
 }
 

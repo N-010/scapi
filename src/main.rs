@@ -1,8 +1,5 @@
 #![cfg(not(target_arch = "wasm32"))]
 
-mod sc_api;
-mod wallet_connect;
-
 #[cfg(target_arch = "wasm32")]
 fn main() {
     panic!("scapi-cli binary is not supported on wasm32 targets");
@@ -10,7 +7,7 @@ fn main() {
 
 #[cfg(not(target_arch = "wasm32"))]
 use anyhow::Result;
-use wallet_connect::*;
+use scapi::wallet_connect::*;
 
 #[cfg(not(target_arch = "wasm32"))]
 #[tokio::main]
@@ -27,13 +24,12 @@ async fn main() -> Result<()> {
     // Step 1: Configuration
     println!("📝 Step 1: Creating WalletConnect configuration...");
 
-    let project_id = std::env::var("WALLET_CONNECT_PROJECT_ID")
-        .unwrap_or_else(|_| {
-            println!("⚠️  WALLET_CONNECT_PROJECT_ID is not set");
-            println!("   Use: set WALLET_CONNECT_PROJECT_ID=your_project_id");
-            println!("   Or get a Project ID at: https://cloud.walletconnect.com/\n");
-            "demo_project_id".to_string()
-        });
+    let project_id = std::env::var("WALLET_CONNECT_PROJECT_ID").unwrap_or_else(|_| {
+        println!("⚠️  WALLET_CONNECT_PROJECT_ID is not set");
+        println!("   Use: set WALLET_CONNECT_PROJECT_ID=your_project_id");
+        println!("   Or get a Project ID at: https://cloud.walletconnect.com/\n");
+        "demo_project_id".to_string()
+    });
 
     let config = WalletConnectConfig::new(project_id.clone(), "qubic:mainnet".to_string());
 
