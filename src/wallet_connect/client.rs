@@ -119,13 +119,13 @@ impl WalletConnectClient {
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let mut client = WalletConnectClient::new(/* config */);
     /// client.init().await?;
-    /// 
+    ///
     /// // This is like JS: const { uri, approval } = await client.connect(...)
     /// let uri = client.connect().await?;
-    /// 
+    ///
     /// // Display QR code or deep link
     /// println!("Scan this: {}", uri);
-    /// 
+    ///
     /// // Then wait for approval (see wait_for_connection)
     /// # Ok(())
     /// # }
@@ -234,11 +234,16 @@ impl WalletConnectClient {
         println!("[WalletConnect] Expiry timestamp: {}", expiry_timestamp);
         println!("[WalletConnect] Optional namespaces:");
         for (ns, ns_params) in &optional_namespaces {
-            println!("  - {}: chains={:?}, methods={:?}, events={:?}", 
-                ns, ns_params.chains, ns_params.methods, ns_params.events);
+            println!(
+                "  - {}: chains={:?}, methods={:?}, events={:?}",
+                ns, ns_params.chains, ns_params.methods, ns_params.events
+            );
         }
-        println!("[WalletConnect] Metadata: name={}, url={}", metadata.name, metadata.url);
-        
+        println!(
+            "[WalletConnect] Metadata: name={}, url={}",
+            metadata.name, metadata.url
+        );
+
         // Serialize and log full SessionPropose JSON
         match serde_json::to_string_pretty(&session_propose) {
             Ok(json) => {
@@ -278,10 +283,7 @@ impl WalletConnectClient {
             encrypted
         );
 
-        tracing::info!(
-            "[WalletConnect] 📤 Subscribing to pairing topic: {}",
-            topic
-        );
+        tracing::info!("[WalletConnect] 📤 Subscribing to pairing topic: {}", topic);
         connection
             .irn_subscribe(&topic)
             .await
@@ -300,13 +302,19 @@ impl WalletConnectClient {
             expiry_timestamp
         );
         println!("\n=== [WalletConnect] SENDING SessionPropose ===\n");
-        println!("[WalletConnect] 📤 Sending SessionPropose on topic: {}", topic);
-        println!("[WalletConnect] 📤 Params: irn_tag={:?}, ttl={}", irn_tag, ttl);
+        println!(
+            "[WalletConnect] 📤 Sending SessionPropose on topic: {}",
+            topic
+        );
+        println!(
+            "[WalletConnect] 📤 Params: irn_tag={:?}, ttl={}",
+            irn_tag, ttl
+        );
         println!("[WalletConnect] 📤 Proposer public key: {}", public_key_hex);
         println!("[WalletConnect] 📤 Expiry timestamp: {}", expiry_timestamp);
-        
+
         eprintln!("[WalletConnect DEBUG] Publishing to topic: {}", topic);
-        
+
         let mut encrypted_message =
             WcEncryptedMessage::new(topic.clone(), encrypted, irn_tag.clone(), ttl);
         if irn_tag == walletconnect_sdk::types::IrnTag::SessionPropose {
@@ -317,13 +325,13 @@ impl WalletConnectClient {
             encrypted_message.prompt
         );
 
-        match connection
-            .irn_publish(encrypted_message)
-            .await
-        {
+        match connection.irn_publish(encrypted_message).await {
             Ok(_) => {
                 println!("[WalletConnect] ✅ SessionPropose sent to relay server!");
-                println!("[WalletConnect] ⏳ Waiting for wallet response on topic: {}", topic);
+                println!(
+                    "[WalletConnect] ⏳ Waiting for wallet response on topic: {}",
+                    topic
+                );
                 eprintln!("[WalletConnect DEBUG] Published successfully to relay");
             }
             Err(e) => {
@@ -364,7 +372,10 @@ impl WalletConnectClient {
         println!("\n=== [WalletConnect] URI GENERATED ===\n");
         println!("[WalletConnect] ✅ Connection URI generated successfully");
         println!("[WalletConnect] 🔑 Pairing topic: {}", topic);
-        println!("[WalletConnect] ⏰ Expiry: {} (expires in 5 minutes)", expiry_timestamp);
+        println!(
+            "[WalletConnect] ⏰ Expiry: {} (expires in 5 minutes)",
+            expiry_timestamp
+        );
         println!("[WalletConnect] 🔐 SymKey (hex): {}", sym_key_hex);
         println!("[WalletConnect] 📋 Full URI:");
         println!("   {}", uri);
@@ -400,11 +411,11 @@ impl WalletConnectClient {
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let mut client = WalletConnectClient::new(/* config */);
     /// client.init().await?;
-    /// 
+    ///
     /// // Generate QR code URI
     /// let uri = client.connect().await?;
     /// println!("Scan this QR: {}", uri);
-    /// 
+    ///
     /// // Wait for user to scan and approve (like JS: await approval())
     /// match client.wait_for_connection(120).await {
     ///     Ok(true) => println!("Connected!"),
@@ -700,7 +711,7 @@ impl WalletConnectClient {
     /// This prevents "connection already established" errors
     async fn cleanup_old_state(&mut self) -> WalletConnectResult<()> {
         tracing::debug!("[WalletConnect] Cleaning up old state...");
-        
+
         // Stop old listener if exists
         {
             let mut handle_guard = self.listener_handle.lock().unwrap();
@@ -747,11 +758,21 @@ impl WalletConnectClient {
         // Add unique identifier to metadata name to avoid wallet caching issues
         // Each connection should have unique metadata to prevent "already connected" errors
         let unique_id = Uuid::new_v4().to_string()[..8].to_string();
-        let unique_name = format!("{} ({}@{})", metadata.name, unique_id, 
-            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs());
-        
-        tracing::debug!("[WalletConnect] Using unique metadata name: {}", unique_name);
-        
+        let unique_name = format!(
+            "{} ({}@{})",
+            metadata.name,
+            unique_id,
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs()
+        );
+
+        tracing::debug!(
+            "[WalletConnect] Using unique metadata name: {}",
+            unique_name
+        );
+
         WcMetadata {
             name: unique_name,
             description: metadata.description.clone(),
@@ -891,7 +912,11 @@ async fn process_topic(
         );
     } else if kind == TopicKind::Initial {
         // Log only for the initial topic to avoid spamming
-        tracing::debug!("[WalletConnect] No messages on topic {} (kind: {:?})", topic, kind);
+        tracing::debug!(
+            "[WalletConnect] No messages on topic {} (kind: {:?})",
+            topic,
+            kind
+        );
     }
 
     for encrypted in messages {
@@ -955,9 +980,7 @@ async fn handle_message(
                 return Ok(());
             }
 
-            tracing::info!(
-                "[WalletConnect] ✅ Received SessionProposeResponse from wallet!"
-            );
+            tracing::info!("[WalletConnect] ✅ Received SessionProposeResponse from wallet!");
             tracing::debug!(
                 "[WalletConnect] Responder public key: {}",
                 resp.responder_public_key
@@ -1000,7 +1023,7 @@ async fn handle_message(
                 "[WalletConnect] 📤 Subscribing to derived topic: {}",
                 derived_topic
             );
-            
+
             state_snapshot
                 .connection
                 .irn_subscribe(&derived_topic)
@@ -1026,7 +1049,7 @@ async fn handle_message(
                     state_mut.derived_topic = Some(derived_topic);
                 }
             }
-            
+
             tracing::info!(
                 "[WalletConnect] ✅ State updated with derived topic. Listener will check for messages on next poll."
             );
@@ -1039,7 +1062,9 @@ async fn handle_message(
                 return Ok(());
             }
 
-            tracing::info!("[WalletConnect] 🎉 SessionSettle received! Session is being established...");
+            tracing::info!(
+                "[WalletConnect] 🎉 SessionSettle received! Session is being established..."
+            );
 
             let topic = state_snapshot
                 .derived_topic
@@ -1063,11 +1088,16 @@ async fn handle_message(
                 }
             }
 
-            tracing::info!("[WalletConnect] ✅ Session established successfully! Topic: {}", topic);
+            tracing::info!(
+                "[WalletConnect] ✅ Session established successfully! Topic: {}",
+                topic
+            );
 
             if let Some(sender) = connection_sender.lock().unwrap().take() {
                 let _ = sender.send(true);
-                tracing::info!("[WalletConnect] ✅ Connection notification sent to wait_for_connection()");
+                tracing::info!(
+                    "[WalletConnect] ✅ Connection notification sent to wait_for_connection()"
+                );
             }
 
             event_handler.emit(

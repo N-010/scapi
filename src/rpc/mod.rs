@@ -128,8 +128,17 @@ mod tests {
 
     #[test]
     fn join_url_normalizes_slashes() {
-        assert_eq!(join_url("https://rpc.qubic.org/live/v1/", "tick-info"), "https://rpc.qubic.org/live/v1/tick-info");
-        assert_eq!(join_url("https://rpc.qubic.org/live/v1", "/tick-info"), "https://rpc.qubic.org/live/v1/tick-info");
-        assert_eq!(join_url("https://rpc.qubic.org/live/v1/", "/tick-info"), "https://rpc.qubic.org/live/v1/tick-info");
+        assert_eq!(
+            join_url("https://rpc.qubic.org/live/v1/", "tick-info"),
+            "https://rpc.qubic.org/live/v1/tick-info"
+        );
+        assert_eq!(
+            join_url("https://rpc.qubic.org/live/v1", "/tick-info"),
+            "https://rpc.qubic.org/live/v1/tick-info"
+        );
+        assert_eq!(
+            join_url("https://rpc.qubic.org/live/v1/", "/tick-info"),
+            "https://rpc.qubic.org/live/v1/tick-info"
+        );
     }
 }

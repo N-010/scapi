@@ -1,9 +1,9 @@
 #![allow(dead_code)]
 
+use crate::rpc::post;
 use anyhow::{anyhow, Result};
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde_json::Value;
-use crate::rpc::post;
 
 /// Sends raw request bytes to Qubic RPC `querySmartContract` endpoint.
 ///
@@ -206,7 +206,8 @@ impl RequestDataBuilder {
     }
 
     pub async fn send(self) -> Result<Vec<u8>> {
-        post::query_smart_contract_with_meta(self.contract_index, self.input_type, &self.buffer).await
+        post::query_smart_contract_with_meta(self.contract_index, self.input_type, &self.buffer)
+            .await
     }
 }
 

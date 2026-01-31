@@ -27,13 +27,15 @@ fn query_smart_contract_url() -> Cow<'static, str> {
     {
         env::var("QUBIC_RPC_QUERY_SMART_CONTRACT")
             .map(Cow::Owned)
-            .unwrap_or_else(|_| Cow::Owned(join_url(base_url().as_ref(), PATH_QUERY_SMART_CONTRACT)))
+            .unwrap_or_else(|_| {
+                Cow::Owned(join_url(base_url().as_ref(), PATH_QUERY_SMART_CONTRACT))
+            })
     }
     #[cfg(target_arch = "wasm32")]
     {
-        option_env!("QUBIC_RPC_QUERY_SMART_CONTRACT").map(Cow::Borrowed).unwrap_or_else(|| {
-            Cow::Owned(join_url(base_url().as_ref(), PATH_QUERY_SMART_CONTRACT))
-        })
+        option_env!("QUBIC_RPC_QUERY_SMART_CONTRACT")
+            .map(Cow::Borrowed)
+            .unwrap_or_else(|| Cow::Owned(join_url(base_url().as_ref(), PATH_QUERY_SMART_CONTRACT)))
     }
 }
 
