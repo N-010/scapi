@@ -88,6 +88,15 @@ impl FromStr for QubicId {
 
 impl QubicId {
     #[inline]
+    pub fn from_le_u64(le_u64: [u64; 4]) -> Self {
+        Self(core::array::from_fn(|i| le_u64[i / 8].to_le_bytes()[i % 8]))
+    }
+
+    pub fn from_contract_id(contract_id: u32) -> QubicId {
+        QubicId::from_le_u64([contract_id as u64, 0, 0, 0])
+    }
+
+    #[inline]
     pub fn get_identity(&self) -> String {
         let mut identity = [0u8; 60];
         for i in 0..4 {

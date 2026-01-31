@@ -25,3 +25,7 @@ pub struct QubicWallet {
 }
 
 pub use impls::*;
+
+pub fn public_key_from_seed(seed: &str) -> Result<QubicId, errors::QubicError> {
+    QubicWallet::from_seed(seed).map(|wallet| wallet.public_key)
+}

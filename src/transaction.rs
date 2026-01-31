@@ -111,6 +111,22 @@ pub fn transaction_bytes(tx: &TransactionWithData) -> Vec<u8> {
     tx.to_bytes()
 }
 
+pub fn build_signed_transaction_bytes(
+    params: &TransactionParams,
+    wallet: &QubicWallet,
+) -> TransactionResult<Vec<u8>> {
+    let tx = build_signed_transaction(params, wallet)?;
+    Ok(transaction_bytes(&tx))
+}
+
+pub fn build_signed_transaction_bytes_from_seed(
+    seed: &str,
+    params: &TransactionParams,
+) -> TransactionResult<Vec<u8>> {
+    let wallet = QubicWallet::from_seed(seed)?;
+    build_signed_transaction_bytes(params, &wallet)
+}
+
 fn ensure_payload_size(payload: &[u8]) -> TransactionResult<()> {
     if payload.len() > u16::MAX as usize {
         return Err(TransactionError::PayloadTooLarge {
