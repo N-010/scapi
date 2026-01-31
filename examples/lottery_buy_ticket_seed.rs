@@ -4,7 +4,7 @@
 use scapi::{
     build_ticket_tx_bytes_from_seed, qubic_transactions::TransactionWithData,
     qubic_types::traits::FromBytes, rpc::get::get_tick_info,
-    rpc::post::broadcast_transaction_bytes, QubicId,
+    rpc::post::broadcast_transaction_bytes, PayloadBuilder, QubicId,
 };
 use std::io::{self, Write};
 
@@ -34,13 +34,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let current_tick = get_tick_info().await?.tick_info.tick;
     let tick = current_tick.saturating_add(scheduled_offset);
 
+    let payload = PayloadBuilder::new().to_bytes();
     let tx_bytes = build_ticket_tx_bytes_from_seed(
         &seed,
         QubicId::from_contract_id(RL_CONTRACT_INDEX),
         amount,
         tick,
         RL_BUY_TICKET_PROC,
-        Vec::new(),
+        payload,
     )?;
     let tx = TransactionWithData::from_bytes(&tx_bytes)?;
     let tx_hash: [u8; 32] = tx.clone().into();

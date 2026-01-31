@@ -46,20 +46,22 @@ Where:
 ### Build `tx_bytes`
 
 ```rust
-use scapi::{QubicId, QubicWallet, build_ticket_tx_bytes};
+use scapi::{PayloadBuilder, QubicId, QubicWallet, build_ticket_tx_bytes};
 
 let wallet = QubicWallet::from_seed("...")?;
 let to = QubicId::from_contract_id(16);
-let tx_bytes = build_ticket_tx_bytes(&wallet, to, 1_000_000, 12345, 1, Vec::new())?;
+let payload = PayloadBuilder::new().to_bytes();
+let tx_bytes = build_ticket_tx_bytes(&wallet, to, 1_000_000, 12345, 1, payload)?;
 ```
 
 Or, if you only have the seed:
 
 ```rust
-use scapi::{QubicId, build_ticket_tx_bytes_from_seed};
+use scapi::{PayloadBuilder, QubicId, build_ticket_tx_bytes_from_seed};
 
 let to = QubicId::from_contract_id(16);
-let tx_bytes = build_ticket_tx_bytes_from_seed("...", to, 1_000_000, 12345, 1, Vec::new())?;
+let payload = PayloadBuilder::new().to_bytes();
+let tx_bytes = build_ticket_tx_bytes_from_seed("...", to, 1_000_000, 12345, 1, payload)?;
 ```
 
 ### Broadcast

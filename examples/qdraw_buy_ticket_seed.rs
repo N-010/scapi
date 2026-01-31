@@ -5,7 +5,7 @@
 /// Payload: struct buyTicket_input { uint64 ticketCount; }
 use scapi::{
     build_ticket_tx_bytes_from_seed, rpc::get::get_tick_info,
-    rpc::post::broadcast_transaction_bytes, QubicId,
+    rpc::post::broadcast_transaction_bytes, PayloadBuilder, QubicId,
 };
 use std::io::{self, Write};
 
@@ -40,7 +40,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tick = current_tick.saturating_add(scheduled_offset);
 
     let input = BuyTicketInput { ticket_count };
-    let payload = input.ticket_count.to_le_bytes().to_vec();
+    let payload = PayloadBuilder::new()
+        .add_uint64(input.ticket_count)
+        .to_bytes();
 
     let tx_bytes = build_ticket_tx_bytes_from_seed(
         &seed,
