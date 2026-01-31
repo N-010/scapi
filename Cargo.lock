@@ -3794,6 +3794,7 @@ dependencies = [
  "serde-wasm-bindgen",
  "serde_json",
  "thiserror",
+ "tiny-keccak",
  "tokio",
  "tracing",
  "tracing-subscriber",
