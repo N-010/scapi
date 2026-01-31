@@ -40,7 +40,7 @@ pub(crate) fn base_url() -> Cow<'static, str> {
     qubic_rpc_base_url()
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct RpcClient {
     base_url: Cow<'static, str>,
     http: Client,
