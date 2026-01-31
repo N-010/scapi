@@ -117,7 +117,11 @@ impl WalletConnectClient {
     /// ```no_run
     /// # use scapi::wallet_connect::*;
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let mut client = WalletConnectClient::new(/* config */);
+    /// let config = WalletConnectConfig::new(
+    ///     "project_id".to_string(),
+    ///     "qubic:mainnet".to_string(),
+    /// );
+    /// let mut client = WalletConnectClient::new(config);
     /// client.init().await?;
     ///
     /// // This is like JS: const { uri, approval } = await client.connect(...)
@@ -409,7 +413,11 @@ impl WalletConnectClient {
     /// ```no_run
     /// # use scapi::wallet_connect::*;
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let mut client = WalletConnectClient::new(/* config */);
+    /// let config = WalletConnectConfig::new(
+    ///     "project_id".to_string(),
+    ///     "qubic:mainnet".to_string(),
+    /// );
+    /// let mut client = WalletConnectClient::new(config);
     /// client.init().await?;
     ///
     /// // Generate QR code URI

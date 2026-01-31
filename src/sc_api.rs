@@ -38,7 +38,7 @@ impl Default for Endianness {
 
 #[derive(Debug, Default, Clone)]
 pub struct RequestDataBuilder {
-    buffer: Vec<u8>,
+    payload: PayloadBuilder,
     endianness: Endianness,
     contract_index: u32,
     input_type: u32,
@@ -47,7 +47,7 @@ pub struct RequestDataBuilder {
 impl RequestDataBuilder {
     pub fn new() -> Self {
         Self {
-            buffer: Vec::new(),
+            payload: PayloadBuilder::new(),
             endianness: Endianness::Little,
             contract_index: 0,
             input_type: 1,
@@ -60,7 +60,7 @@ impl RequestDataBuilder {
     }
 
     pub fn add_bytes(mut self, bytes: &[u8]) -> Self {
-        self.buffer.extend_from_slice(bytes);
+        self.payload = self.payload.add_bytes(bytes);
         self
     }
 
@@ -71,6 +71,171 @@ impl RequestDataBuilder {
 
     pub fn set_input_type(mut self, input_type: u32) -> Self {
         self.input_type = input_type;
+        self
+    }
+
+    pub fn add_bool(mut self, value: bool) -> Self {
+        self.payload = self.payload.add_bool(value);
+        self
+    }
+
+    pub fn add_int8(mut self, value: i8) -> Self {
+        self.payload = self.payload.add_int8(value);
+        self
+    }
+
+    pub fn add_uint8(mut self, value: u8) -> Self {
+        self.payload = self.payload.add_uint8(value);
+        self
+    }
+
+    pub fn add_int16(mut self, value: i16) -> Self {
+        let bytes = match self.endianness {
+            Endianness::Little => value.to_le_bytes(),
+            Endianness::Big => value.to_be_bytes(),
+        };
+        self.payload = self.payload.add_bytes(&bytes);
+        self
+    }
+
+    pub fn add_uint16(mut self, value: u16) -> Self {
+        let bytes = match self.endianness {
+            Endianness::Little => value.to_le_bytes(),
+            Endianness::Big => value.to_be_bytes(),
+        };
+        self.payload = self.payload.add_bytes(&bytes);
+        self
+    }
+
+    pub fn add_int32(mut self, value: i32) -> Self {
+        let bytes = match self.endianness {
+            Endianness::Little => value.to_le_bytes(),
+            Endianness::Big => value.to_be_bytes(),
+        };
+        self.payload = self.payload.add_bytes(&bytes);
+        self
+    }
+
+    pub fn add_uint32_legacy(self, value: u32) -> Self {
+        // Backward compatibility for earlier camelCase variant
+        self.add_uint32(value)
+    }
+
+    pub fn add_uint32(mut self, value: u32) -> Self {
+        let bytes = match self.endianness {
+            Endianness::Little => value.to_le_bytes(),
+            Endianness::Big => value.to_be_bytes(),
+        };
+        self.payload = self.payload.add_bytes(&bytes);
+        self
+    }
+
+    pub fn add_int64(mut self, value: i64) -> Self {
+        let bytes = match self.endianness {
+            Endianness::Little => value.to_le_bytes(),
+            Endianness::Big => value.to_be_bytes(),
+        };
+        self.payload = self.payload.add_bytes(&bytes);
+        self
+    }
+
+    pub fn add_uint64(mut self, value: u64) -> Self {
+        let bytes = match self.endianness {
+            Endianness::Little => value.to_le_bytes(),
+            Endianness::Big => value.to_be_bytes(),
+        };
+        self.payload = self.payload.add_bytes(&bytes);
+        self
+    }
+
+    pub fn add_float(mut self, value: f32) -> Self {
+        let bytes = match self.endianness {
+            Endianness::Little => value.to_le_bytes(),
+            Endianness::Big => value.to_be_bytes(),
+        };
+        self.payload = self.payload.add_bytes(&bytes);
+        self
+    }
+
+    pub fn add_double(mut self, value: f64) -> Self {
+        let bytes = match self.endianness {
+            Endianness::Little => value.to_le_bytes(),
+            Endianness::Big => value.to_be_bytes(),
+        };
+        self.payload = self.payload.add_bytes(&bytes);
+        self
+    }
+
+    pub fn add_char(mut self, value: u8) -> Self {
+        // C++ char as single byte
+        self.payload = self.payload.add_char(value);
+        self
+    }
+
+    /// Append 256-bit integer (m256i) from raw 32 bytes as-is
+    pub fn add_m256i_bytes(mut self, bytes32: [u8; 32]) -> Self {
+        self.payload = self.payload.add_m256i_bytes(bytes32);
+        self
+    }
+
+    /// Append 256-bit integer assembled from four u64 words.
+    /// Word order respects current endianness:
+    /// - Little endian: least-significant word first
+    /// - Big endian: most-significant word first
+    pub fn add_m256i_from_u64x4(mut self, w0: u64, w1: u64, w2: u64, w3: u64) -> Self {
+        let words = match self.endianness {
+            Endianness::Little => [w0, w1, w2, w3],
+            Endianness::Big => [w3, w2, w1, w0],
+        };
+        for w in words {
+            let bytes = match self.endianness {
+                Endianness::Little => w.to_le_bytes(),
+                Endianness::Big => w.to_be_bytes(),
+            };
+            self.payload = self.payload.add_bytes(&bytes);
+        }
+        self
+    }
+
+    pub fn to_bytes(self) -> Vec<u8> {
+        self.payload.to_bytes()
+    }
+
+    pub fn to_base64(&self) -> String {
+        self.payload.to_base64()
+    }
+
+    pub async fn send(self) -> Result<Vec<u8>> {
+        let payload = self.payload.to_bytes();
+        post::query_smart_contract_with_meta(self.contract_index, self.input_type, &payload).await
+    }
+}
+
+// ------------------------
+// PayloadBuilder (Little Endian)
+// ------------------------
+
+#[derive(Debug, Default, Clone)]
+pub struct PayloadBuilder {
+    buffer: Vec<u8>,
+    endianness: Endianness,
+}
+
+impl PayloadBuilder {
+    pub fn new() -> Self {
+        Self {
+            buffer: Vec::new(),
+            endianness: Endianness::Little,
+        }
+    }
+
+    pub fn with_endianness(mut self, endianness: Endianness) -> Self {
+        self.endianness = endianness;
+        self
+    }
+
+    pub fn add_bytes(mut self, bytes: &[u8]) -> Self {
+        self.buffer.extend_from_slice(bytes);
         self
     }
 
@@ -114,11 +279,6 @@ impl RequestDataBuilder {
         };
         self.buffer.extend_from_slice(&bytes);
         self
-    }
-
-    pub fn add_uint32_legacy(self, value: u32) -> Self {
-        // Backward compatibility for earlier camelCase variant
-        self.add_uint32(value)
     }
 
     pub fn add_uint32(mut self, value: u32) -> Self {
@@ -167,7 +327,6 @@ impl RequestDataBuilder {
     }
 
     pub fn add_char(mut self, value: u8) -> Self {
-        // C++ char as single byte
         self.buffer.push(value);
         self
     }
@@ -179,9 +338,6 @@ impl RequestDataBuilder {
     }
 
     /// Append 256-bit integer assembled from four u64 words.
-    /// Word order respects current endianness:
-    /// - Little endian: least-significant word first
-    /// - Big endian: most-significant word first
     pub fn add_m256i_from_u64x4(mut self, w0: u64, w1: u64, w2: u64, w3: u64) -> Self {
         let words = match self.endianness {
             Endianness::Little => [w0, w1, w2, w3],
@@ -203,11 +359,6 @@ impl RequestDataBuilder {
 
     pub fn to_base64(&self) -> String {
         STANDARD.encode(&self.buffer)
-    }
-
-    pub async fn send(self) -> Result<Vec<u8>> {
-        post::query_smart_contract_with_meta(self.contract_index, self.input_type, &self.buffer)
-            .await
     }
 }
 
@@ -735,7 +886,7 @@ mod tests {
     fn test_request_builder_add_uint8() {
         let builder = RequestDataBuilder::new().add_uint8(10);
 
-        assert_eq!(builder.buffer, vec![10]);
+        assert_eq!(builder.to_bytes(), vec![10]);
     }
 
     #[test]
@@ -744,7 +895,7 @@ mod tests {
             .with_endianness(Endianness::Little)
             .add_uint16(0x1234);
 
-        assert_eq!(builder.buffer, vec![0x34, 0x12]);
+        assert_eq!(builder.to_bytes(), vec![0x34, 0x12]);
     }
 
     #[test]
@@ -753,7 +904,7 @@ mod tests {
             .with_endianness(Endianness::Little)
             .add_uint32(0x12345678);
 
-        assert_eq!(builder.buffer, vec![0x78, 0x56, 0x34, 0x12]);
+        assert_eq!(builder.to_bytes(), vec![0x78, 0x56, 0x34, 0x12]);
     }
 
     #[test]
@@ -1075,5 +1226,49 @@ mod tests {
 
         let bytes = builder.to_bytes();
         assert_eq!(bytes.len(), 4 + 8); // 12 bytes
+    }
+
+    // PayloadBuilder tests
+    #[test]
+    fn test_payload_builder_basic() {
+        let builder = PayloadBuilder::new().add_uint8(10).add_uint16(1000);
+
+        let bytes = builder.to_bytes();
+        assert_eq!(bytes.len(), 1 + 2);
+        assert_eq!(bytes[0], 10);
+    }
+
+    #[test]
+    fn test_payload_builder_endianness() {
+        let le = PayloadBuilder::new()
+            .with_endianness(Endianness::Little)
+            .add_uint16(0x1234)
+            .to_bytes();
+
+        assert_eq!(le[0], 0x34);
+        assert_eq!(le[1], 0x12);
+
+        let be = PayloadBuilder::new()
+            .with_endianness(Endianness::Big)
+            .add_uint16(0x1234)
+            .to_bytes();
+
+        assert_eq!(be[0], 0x12);
+        assert_eq!(be[1], 0x34);
+    }
+
+    #[test]
+    fn test_payload_builder_to_base64() {
+        let builder = PayloadBuilder::new()
+            .add_uint8(0x01)
+            .add_uint8(0x02)
+            .add_uint8(0x03);
+
+        let base64 = builder.to_base64();
+        assert!(!base64.is_empty());
+
+        use base64::{engine::general_purpose::STANDARD, Engine as _};
+        let decoded = STANDARD.decode(&base64).unwrap();
+        assert_eq!(decoded, vec![0x01, 0x02, 0x03]);
     }
 }
