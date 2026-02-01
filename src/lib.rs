@@ -12,7 +12,10 @@ pub mod wasm;
 
 pub use crate::qubic_transactions::*;
 pub use crate::qubic_types::*;
-pub use crate::rpc::{get, post, QueryResponsePossible, RpcClient, DEFAULT_QUBIC_RPC_QUERY};
+pub use crate::rpc::{
+    get, post, set_default_qubic_rpc_query, QueryResponsePossible, RpcClient,
+    DEFAULT_QUBIC_RPC_QUERY,
+};
 pub use crate::sc_api::*;
 pub use crate::transaction::*;
 #[cfg(not(target_arch = "wasm32"))]

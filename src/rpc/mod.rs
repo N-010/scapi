@@ -6,6 +6,7 @@ use serde_json::Value;
 use std::borrow::Cow;
 #[cfg(not(target_arch = "wasm32"))]
 use std::env;
+use std::sync::{OnceLock, RwLock};
 
 pub mod get;
 pub mod post;
@@ -15,7 +16,25 @@ pub use post::*;
 
 pub const DEFAULT_QUBIC_RPC_QUERY: &str = "https://rpc.qubic.org/live/v1/";
 
+static DEFAULT_RPC_BASE_URL_OVERRIDE: OnceLock<RwLock<Option<String>>> = OnceLock::new();
+
+pub fn set_default_qubic_rpc_query<S: Into<String>>(base_url: S) {
+    let storage = DEFAULT_RPC_BASE_URL_OVERRIDE.get_or_init(|| RwLock::new(None));
+    let mut guard = storage.write().expect("default RPC base URL lock poisoned");
+    *guard = Some(base_url.into());
+}
+
+fn default_qubic_rpc_query_override() -> Option<Cow<'static, str>> {
+    DEFAULT_RPC_BASE_URL_OVERRIDE
+        .get()
+        .and_then(|lock| lock.read().ok().and_then(|guard| guard.clone()))
+        .map(Cow::Owned)
+}
+
 fn qubic_rpc_base_url() -> Cow<'static, str> {
+    if let Some(override_url) = default_qubic_rpc_query_override() {
+        return override_url;
+    }
     #[cfg(not(target_arch = "wasm32"))]
     {
         env::var("QUBIC_RPC_BASE_URL")
