@@ -1,7 +1,4 @@
 #![allow(unused_assignments)]
-#[cfg(target_arch = "x86_64")]
-use core::arch::x86_64::{_addcarry_u64, _subborrow_u64};
-
 use crate::four_q::{
     consts::{
         B11, B12, B13, B14, B21, B22, B23, B24, B31, B32, B33, B34, B41, B42, B43, B44, C1, C2, C3,
@@ -18,38 +15,22 @@ use core::ptr::copy_nonoverlapping;
 
 #[inline(always)]
 pub fn addcarry_u64(c_in: u8, a: u64, b: u64, out: &mut u64) -> u8 {
-    #[cfg(target_arch = "x86_64")]
-    {
-        _addcarry_u64(c_in, a, b, out)
-    }
+    let c_out = a.overflowing_add(b);
+    let c_out1 = c_out.0.overflowing_add(if c_in != 0 { 1 } else { 0 });
 
-    #[cfg(not(target_arch = "x86_64"))]
-    {
-        let c_out = a.overflowing_add(b);
-        let c_out1 = c_out.0.overflowing_add(if c_in != 0 { 1 } else { 0 });
+    *out = c_out1.0;
 
-        *out = c_out1.0;
-
-        (c_out.1 || c_out1.1) as u8
-    }
+    (c_out.1 || c_out1.1) as u8
 }
 
 #[inline(always)]
 pub fn subborrow_u64(b_in: u8, a: u64, b: u64, out: &mut u64) -> u8 {
-    #[cfg(target_arch = "x86_64")]
-    {
-        _subborrow_u64(b_in, a, b, out)
-    }
+    let b_out = a.overflowing_sub(b);
+    let b_out1 = b_out.0.overflowing_sub(if b_in != 0 { 1 } else { 0 });
 
-    #[cfg(not(target_arch = "x86_64"))]
-    {
-        let b_out = a.overflowing_sub(b);
-        let b_out1 = b_out.0.overflowing_sub(if b_in != 0 { 1 } else { 0 });
+    *out = b_out1.0;
 
-        *out = b_out1.0;
-
-        (b_out.1 || b_out1.1) as u8
-    }
+    (b_out.1 || b_out1.1) as u8
 }
 
 /// Modular correction, a = a mod (2^127-1)
@@ -1708,12 +1689,15 @@ pub fn ecc_mul(p: &mut PointAffine, k: &[u64], q: &mut PointAffine) -> bool {
 
     ecc_precomp(&mut r, &mut table[1]);
 
-    for i in 0..8 {
-        table[0][i].xy = table[1][i].yx;
-        table[0][i].yx = table[1][i].xy;
-        table[0][i].t2 = table[1][i].t2;
-        table[0][i].z2 = table[1][i].z2;
-        fp2neg1271(&mut table[0][i].t2);
+    let (table_zero, table_one) = table.split_at_mut(1);
+    let table_zero = &mut table_zero[0];
+    let table_one = &table_one[0];
+    for (dst, src) in table_zero.iter_mut().zip(table_one.iter()) {
+        dst.xy = src.yx;
+        dst.yx = src.xy;
+        dst.t2 = src.t2;
+        dst.z2 = src.z2;
+        fp2neg1271(&mut dst.t2);
     }
 
     r2_to_r4(

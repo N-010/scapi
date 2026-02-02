@@ -28,21 +28,27 @@ use x25519_dalek::{PublicKey as X25519PublicKey, StaticSecret as X25519StaticSec
 #[derive(Clone)]
 struct ClientState {
     connection: WcConnection,
-    client_seed: [u8; 32],
     sym_key: [u8; 32],
     topic: String,
     private_key: [u8; 32],
-    public_key: [u8; 32],
     derived_sym_key: Option<[u8; 32]>,
     derived_topic: Option<String>,
-    session_established: bool,
-    optional_namespaces: HashMap<String, WcNamespace>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum TopicKind {
     Initial,
     Derived,
+}
+
+struct HandleMessageContext<'a> {
+    state: &'a Arc<Mutex<Option<ClientState>>>,
+    state_snapshot: &'a ClientState,
+    sym_key: [u8; 32],
+    kind: TopicKind,
+    event_handler: &'a EventHandler,
+    session_store: &'a Arc<Mutex<Option<Session>>>,
+    connection_sender: &'a Arc<Mutex<Option<tokio::sync::oneshot::Sender<bool>>>>,
 }
 
 /// WalletConnect client for Qubic
@@ -352,15 +358,11 @@ impl WalletConnectClient {
             let mut state_guard = self.state.lock().unwrap();
             *state_guard = Some(ClientState {
                 connection: connection.clone(),
-                client_seed,
                 sym_key: sym_key_bytes,
                 topic: topic.clone(),
                 private_key,
-                public_key: public_key_bytes,
                 derived_sym_key: None,
                 derived_topic: None,
-                session_established: false,
-                optional_namespaces: optional_namespaces.clone(),
             });
         }
 
@@ -927,19 +929,18 @@ async fn process_topic(
         );
     }
 
+    let ctx = HandleMessageContext {
+        state,
+        state_snapshot: &state_snapshot,
+        sym_key,
+        kind,
+        event_handler,
+        session_store,
+        connection_sender,
+    };
+
     for encrypted in messages {
-        if let Err(err) = handle_message(
-            state,
-            &state_snapshot,
-            encrypted,
-            sym_key,
-            kind,
-            event_handler,
-            session_store,
-            connection_sender,
-        )
-        .await
-        {
+        if let Err(err) = handle_message(&ctx, encrypted).await {
             tracing::error!(
                 "[WalletConnect] Failed to handle message on topic {}: {}",
                 topic,
@@ -952,36 +953,30 @@ async fn process_topic(
 }
 
 async fn handle_message(
-    state: &Arc<Mutex<Option<ClientState>>>,
-    state_snapshot: &ClientState,
+    ctx: &HandleMessageContext<'_>,
     encrypted: WcEncryptedMessage,
-    sym_key: [u8; 32],
-    kind: TopicKind,
-    event_handler: &EventHandler,
-    session_store: &Arc<Mutex<Option<Session>>>,
-    connection_sender: &Arc<Mutex<Option<tokio::sync::oneshot::Sender<bool>>>>,
 ) -> WalletConnectResult<()> {
     let topic = &encrypted.topic; // Get topic from encrypted message
     let decrypted =
-        WcRawMessage::decrypt(&encrypted.message, sym_key, None).map_err(map_sdk_error)?;
+        WcRawMessage::decrypt(&encrypted.message, ctx.sym_key, None).map_err(map_sdk_error)?;
     let decoded = decrypted.clone().decode().map_err(map_sdk_error)?;
 
     let method_name = decoded.data.method();
     println!(
         "[WalletConnect] 📨 Received message from wallet: {:?} on topic {} (kind: {:?})",
-        method_name, topic, kind
+        method_name, topic, ctx.kind
     );
     tracing::info!(
         "[WalletConnect] 📨 Received message: {:?} on topic {} (kind: {:?})",
         method_name,
         topic,
-        kind
+        ctx.kind
     );
 
     let message_data = decoded.data.clone();
     match message_data {
         WcData::SessionProposeResponse(resp) => {
-            if kind != TopicKind::Initial {
+            if ctx.kind != TopicKind::Initial {
                 tracing::debug!(
                     "[WalletConnect] SessionProposeResponse received on derived topic, ignoring"
                 );
@@ -995,7 +990,7 @@ async fn handle_message(
             );
 
             let already_has_derived = {
-                let guard = state.lock().unwrap();
+                let guard = ctx.state.lock().unwrap();
                 guard
                     .as_ref()
                     .and_then(|s| s.derived_topic.clone())
@@ -1019,7 +1014,7 @@ async fn handle_message(
             let mut responder_pk = [0u8; 32];
             responder_pk.copy_from_slice(&responder_pk_vec);
 
-            let derived_sym_key = derive_sym_key(state_snapshot.private_key, responder_pk);
+            let derived_sym_key = derive_sym_key(ctx.state_snapshot.private_key, responder_pk);
             let derived_topic = hex::encode(wc_sha256(derived_sym_key));
 
             tracing::info!(
@@ -1032,7 +1027,7 @@ async fn handle_message(
                 derived_topic
             );
 
-            state_snapshot
+            ctx.state_snapshot
                 .connection
                 .irn_subscribe(&derived_topic)
                 .await
@@ -1051,7 +1046,7 @@ async fn handle_message(
             );
 
             {
-                let mut guard = state.lock().unwrap();
+                let mut guard = ctx.state.lock().unwrap();
                 if let Some(state_mut) = guard.as_mut() {
                     state_mut.derived_sym_key = Some(derived_sym_key);
                     state_mut.derived_topic = Some(derived_topic);
@@ -1063,7 +1058,7 @@ async fn handle_message(
             );
         }
         WcData::SessionSettle(params) => {
-            if kind != TopicKind::Derived {
+            if ctx.kind != TopicKind::Derived {
                 tracing::debug!(
                     "[WalletConnect] SessionSettle received on pairing topic; waiting for derived topic"
                 );
@@ -1074,10 +1069,11 @@ async fn handle_message(
                 "[WalletConnect] 🎉 SessionSettle received! Session is being established..."
             );
 
-            let topic = state_snapshot
+            let topic = ctx
+                .state_snapshot
                 .derived_topic
                 .clone()
-                .unwrap_or_else(|| state_snapshot.topic.clone());
+                .unwrap_or_else(|| ctx.state_snapshot.topic.clone());
 
             let session = Session {
                 topic: topic.clone(),
@@ -1087,28 +1083,20 @@ async fn handle_message(
                 namespaces: serde_json::to_value(&params.namespaces)?,
                 relay_protocol: params.relay.protocol.clone(),
             };
-            *session_store.lock().unwrap() = Some(session.clone());
-
-            {
-                let mut guard = state.lock().unwrap();
-                if let Some(state_mut) = guard.as_mut() {
-                    state_mut.session_established = true;
-                }
-            }
-
+            *ctx.session_store.lock().unwrap() = Some(session.clone());
             tracing::info!(
                 "[WalletConnect] ✅ Session established successfully! Topic: {}",
                 topic
             );
 
-            if let Some(sender) = connection_sender.lock().unwrap().take() {
+            if let Some(sender) = ctx.connection_sender.lock().unwrap().take() {
                 let _ = sender.send(true);
                 tracing::info!(
                     "[WalletConnect] ✅ Connection notification sent to wait_for_connection()"
                 );
             }
 
-            event_handler.emit(
+            ctx.event_handler.emit(
                 WalletConnectEvent::SessionUpdate,
                 serde_json::json!({ "session": session }),
             );
@@ -1116,9 +1104,9 @@ async fn handle_message(
             let response = decoded.create_response(WcData::SessionSettleResult(true), None);
             let response_raw = response.into_raw().map_err(map_sdk_error)?;
             let encrypted_ack = response_raw
-                .encrypt(sym_key, Some(TYPE_0), None, None)
+                .encrypt(ctx.sym_key, Some(TYPE_0), None, None)
                 .map_err(map_sdk_error)?;
-            state_snapshot
+            ctx.state_snapshot
                 .connection
                 .irn_publish(WcEncryptedMessage::new(
                     topic,
@@ -1133,16 +1121,16 @@ async fn handle_message(
             tracing::debug!("[WalletConnect] Received session settle result: {}", result);
         }
         WcData::SessionRequest(params) => {
-            event_handler.emit(
+            ctx.event_handler.emit(
                 WalletConnectEvent::SessionRequest,
                 serde_json::json!({
-                    "topic": if kind == TopicKind::Derived {
-                        state_snapshot
+                    "topic": if ctx.kind == TopicKind::Derived {
+                        ctx.state_snapshot
                             .derived_topic
                             .clone()
-                            .unwrap_or_else(|| state_snapshot.topic.clone())
+                            .unwrap_or_else(|| ctx.state_snapshot.topic.clone())
                     } else {
-                        state_snapshot.topic.clone()
+                        ctx.state_snapshot.topic.clone()
                     },
                     "request": params
                 }),
@@ -1153,10 +1141,10 @@ async fn handle_message(
                 "[WalletConnect] Wallet requested session delete: {:?}",
                 payload
             );
-            if let Some(sender) = connection_sender.lock().unwrap().take() {
+            if let Some(sender) = ctx.connection_sender.lock().unwrap().take() {
                 let _ = sender.send(false);
             }
-            event_handler.emit(
+            ctx.event_handler.emit(
                 WalletConnectEvent::SessionDelete,
                 serde_json::json!({ "payload": payload }),
             );
@@ -1178,7 +1166,7 @@ async fn handle_message(
                     "Wallet rejected the connection request for unknown reason."
                 }
             );
-            if let Some(sender) = connection_sender.lock().unwrap().take() {
+            if let Some(sender) = ctx.connection_sender.lock().unwrap().take() {
                 let _ = sender.send(false);
             }
             return Err(WalletConnectError::ConnectionFailed(format!(
@@ -1189,7 +1177,7 @@ async fn handle_message(
         other => {
             tracing::debug!(
                 "[WalletConnect] Ignoring message on topic {:?}: {:?}",
-                kind,
+                ctx.kind,
                 other
             );
         }

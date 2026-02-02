@@ -19,7 +19,6 @@ pub struct QubicId(pub [u8; 32]);
 /// Represents a Qubic wallet containing private key, subseed and public key of the corresponding wallet
 #[derive(Debug, Clone, Copy, Default)]
 pub struct QubicWallet {
-    private_key: [u8; 32],
     subseed: [u8; 32],
     pub public_key: QubicId,
 }

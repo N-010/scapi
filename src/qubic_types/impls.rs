@@ -1,5 +1,3 @@
-#[cfg(target_arch = "x86_64")]
-use core::arch::x86_64::{_addcarry_u64, _subborrow_u64};
 use core::{fmt::Display, ptr::copy_nonoverlapping, str::FromStr};
 
 use tiny_keccak::{Hasher, IntoXof, KangarooTwelve, Xof};
@@ -13,37 +11,21 @@ use crate::four_q::{
 use super::{errors::QubicError, traits::ToBytes, QubicId, QubicWallet, Signature};
 
 fn addcarry_u64(c_in: u8, a: u64, b: u64, out: &mut u64) -> u8 {
-    #[cfg(target_arch = "x86_64")]
-    {
-        _addcarry_u64(c_in, a, b, out)
-    }
+    let c_out = a.overflowing_add(b);
+    let c_out1 = c_out.0.overflowing_add(if c_in != 0 { 1 } else { 0 });
 
-    #[cfg(not(target_arch = "x86_64"))]
-    {
-        let c_out = a.overflowing_add(b);
-        let c_out1 = c_out.0.overflowing_add(if c_in != 0 { 1 } else { 0 });
+    *out = c_out1.0;
 
-        *out = c_out1.0;
-
-        (c_out.1 || c_out1.1) as u8
-    }
+    (c_out.1 || c_out1.1) as u8
 }
 
 fn subborrow_u64(b_in: u8, a: u64, b: u64, out: &mut u64) -> u8 {
-    #[cfg(target_arch = "x86_64")]
-    {
-        _subborrow_u64(b_in, a, b, out)
-    }
+    let b_out = a.overflowing_sub(b);
+    let b_out1 = b_out.0.overflowing_sub(if b_in != 0 { 1 } else { 0 });
 
-    #[cfg(not(target_arch = "x86_64"))]
-    {
-        let b_out = a.overflowing_sub(b);
-        let b_out1 = b_out.0.overflowing_sub(if b_in != 0 { 1 } else { 0 });
+    *out = b_out1.0;
 
-        *out = b_out1.0;
-
-        (b_out.1 || b_out1.1) as u8
-    }
+    (b_out.1 || b_out1.1) as u8
 }
 
 impl FromStr for QubicId {
@@ -213,7 +195,6 @@ impl QubicWallet {
         let public_key = Self::get_public_key(&private_key);
 
         Ok(Self {
-            private_key,
             public_key: QubicId(public_key),
             subseed,
         })

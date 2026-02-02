@@ -133,6 +133,12 @@ impl RpcClient {
     }
 }
 
+impl Default for RpcClient {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct QueryResponsePossible {
     #[serde(rename = "responseData")]

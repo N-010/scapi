@@ -24,16 +24,11 @@ pub async fn query_smart_contract(request_bytes: &[u8]) -> Result<Vec<u8>> {
     post::query_smart_contract(request_bytes).await
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub enum Endianness {
+    #[default]
     Little,
     Big,
-}
-
-impl Default for Endianness {
-    fn default() -> Self {
-        Endianness::Little
-    }
 }
 
 #[derive(Debug, Default, Clone)]

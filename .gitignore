@@ -23,3 +23,5 @@ yarn-error.log
 # Testing
 .env
 .env.local
+
+.tmp
