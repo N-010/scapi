@@ -15,8 +15,10 @@ pub use get::*;
 pub use post::*;
 
 pub const DEFAULT_QUBIC_RPC_QUERY: &str = "https://rpc.qubic.org/live/v1/";
+pub const DEFAULT_QUBIC_RPC_QUERY_SERVICES: &str = "https://rpc.qubic.org/query/v1/";
 
 static DEFAULT_RPC_BASE_URL_OVERRIDE: OnceLock<RwLock<Option<String>>> = OnceLock::new();
+static DEFAULT_RPC_QUERY_BASE_URL_OVERRIDE: OnceLock<RwLock<Option<String>>> = OnceLock::new();
 
 pub fn set_default_qubic_rpc_query<S: Into<String>>(base_url: S) {
     let storage = DEFAULT_RPC_BASE_URL_OVERRIDE.get_or_init(|| RwLock::new(None));
@@ -24,8 +26,23 @@ pub fn set_default_qubic_rpc_query<S: Into<String>>(base_url: S) {
     *guard = Some(base_url.into());
 }
 
+pub fn set_default_qubic_rpc_query_services<S: Into<String>>(base_url: S) {
+    let storage = DEFAULT_RPC_QUERY_BASE_URL_OVERRIDE.get_or_init(|| RwLock::new(None));
+    let mut guard = storage
+        .write()
+        .expect("default RPC query base URL lock poisoned");
+    *guard = Some(base_url.into());
+}
+
 fn default_qubic_rpc_query_override() -> Option<Cow<'static, str>> {
     DEFAULT_RPC_BASE_URL_OVERRIDE
+        .get()
+        .and_then(|lock| lock.read().ok().and_then(|guard| guard.clone()))
+        .map(Cow::Owned)
+}
+
+fn default_qubic_rpc_query_services_override() -> Option<Cow<'static, str>> {
+    DEFAULT_RPC_QUERY_BASE_URL_OVERRIDE
         .get()
         .and_then(|lock| lock.read().ok().and_then(|guard| guard.clone()))
         .map(Cow::Owned)
@@ -49,6 +66,24 @@ fn qubic_rpc_base_url() -> Cow<'static, str> {
     }
 }
 
+fn qubic_rpc_query_base_url() -> Cow<'static, str> {
+    if let Some(override_url) = default_qubic_rpc_query_services_override() {
+        return override_url;
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        env::var("QUBIC_RPC_QUERY_BASE_URL")
+            .map(Cow::Owned)
+            .unwrap_or_else(|_| Cow::Borrowed(DEFAULT_QUBIC_RPC_QUERY_SERVICES))
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        option_env!("QUBIC_RPC_QUERY_BASE_URL")
+            .map(Cow::Borrowed)
+            .unwrap_or_else(|| Cow::Borrowed(DEFAULT_QUBIC_RPC_QUERY_SERVICES))
+    }
+}
+
 pub(crate) fn join_url(base: &str, path: &str) -> String {
     let base = base.trim_end_matches('/');
     let path = path.trim_start_matches('/');
@@ -57,6 +92,10 @@ pub(crate) fn join_url(base: &str, path: &str) -> String {
 
 pub(crate) fn base_url() -> Cow<'static, str> {
     qubic_rpc_base_url()
+}
+
+pub(crate) fn query_base_url() -> Cow<'static, str> {
+    qubic_rpc_query_base_url()
 }
 
 #[derive(Clone, Debug)]

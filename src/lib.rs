@@ -13,8 +13,8 @@ pub mod wasm;
 pub use crate::qubic_transactions::*;
 pub use crate::qubic_types::*;
 pub use crate::rpc::{
-    get, post, set_default_qubic_rpc_query, QueryResponsePossible, RpcClient,
-    DEFAULT_QUBIC_RPC_QUERY,
+    get, post, set_default_qubic_rpc_query, set_default_qubic_rpc_query_services,
+    QueryResponsePossible, RpcClient, DEFAULT_QUBIC_RPC_QUERY, DEFAULT_QUBIC_RPC_QUERY_SERVICES,
 };
 pub use crate::sc_api::*;
 pub use crate::transaction::*;
