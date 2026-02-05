@@ -1,3 +1,4 @@
+use crate::rpc::{set_default_qubic_rpc_query, set_default_qubic_rpc_query_services, RpcClient};
 use crate::{
     query_smart_contract, query_smart_contract_with_meta, Endianness, RequestDataBuilder,
     ResponseDecoder,
@@ -6,7 +7,9 @@ use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine as _;
 use js_sys::{Promise, Uint8Array};
 use qrcode::{render::svg, QrCode};
+use serde_json::Value;
 use serde_wasm_bindgen::Serializer;
+use std::borrow::Cow;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 
@@ -22,6 +25,10 @@ fn into_js_value<T: serde::Serialize>(value: T) -> std::result::Result<JsValue, 
 
 fn vec_to_uint8array(bytes: Vec<u8>) -> JsValue {
     Uint8Array::from(bytes.as_slice()).into()
+}
+
+fn js_to_value(value: JsValue) -> Result<Value, JsValue> {
+    serde_wasm_bindgen::from_value(value).map_err(|err| JsValue::from_str(&err.to_string()))
 }
 
 #[wasm_bindgen(js_name = RequestDataBuilder)]
@@ -405,4 +412,87 @@ impl ResponseDecoderHandle {
 #[wasm_bindgen]
 pub fn decode_response_to_js(bytes: Vec<u8>) -> Result<JsValue, JsValue> {
     ResponseDecoderHandle::new(bytes).to_value()
+}
+
+#[wasm_bindgen(js_name = setDefaultRpcBaseUrl)]
+pub fn set_default_rpc_base_url(url: String) {
+    set_default_qubic_rpc_query(url);
+}
+
+#[wasm_bindgen(js_name = setDefaultRpcQueryBaseUrl)]
+pub fn set_default_rpc_query_base_url(url: String) {
+    set_default_qubic_rpc_query_services(url);
+}
+
+#[wasm_bindgen(js_name = RpcHttpClient)]
+pub struct RpcHttpClient {
+    base_url: String,
+    client: RpcClient,
+}
+
+#[wasm_bindgen(js_class = RpcHttpClient)]
+impl RpcHttpClient {
+    #[wasm_bindgen(constructor)]
+    pub fn new(base_url: String) -> RpcHttpClient {
+        let client = RpcClient::with_base_url(Cow::Owned(base_url.clone()));
+        RpcHttpClient { base_url, client }
+    }
+
+    #[wasm_bindgen(js_name = baseUrl)]
+    pub fn base_url(&self) -> String {
+        self.base_url.clone()
+    }
+
+    #[wasm_bindgen(js_name = setBaseUrl)]
+    pub fn set_base_url(&mut self, base_url: String) {
+        self.base_url = base_url.clone();
+        self.client = RpcClient::with_base_url(Cow::Owned(base_url));
+    }
+
+    #[wasm_bindgen(js_name = getJson)]
+    pub fn get_json(&self, path: String) -> Promise {
+        let client = self.client.clone();
+        future_to_promise(async move {
+            let value = client.get_json_value(&path).await.map_err(anyhow_to_js)?;
+            into_js_value(value)
+        })
+    }
+
+    #[wasm_bindgen(js_name = getJsonUrl)]
+    pub fn get_json_url(&self, url: String) -> Promise {
+        let client = self.client.clone();
+        future_to_promise(async move {
+            let value = client
+                .get_json_value_url(&url)
+                .await
+                .map_err(anyhow_to_js)?;
+            into_js_value(value)
+        })
+    }
+
+    #[wasm_bindgen(js_name = postJson)]
+    pub fn post_json(&self, path: String, payload: JsValue) -> Promise {
+        let client = self.client.clone();
+        future_to_promise(async move {
+            let payload_value = js_to_value(payload)?;
+            let value = client
+                .post_json_value(&path, &payload_value)
+                .await
+                .map_err(anyhow_to_js)?;
+            into_js_value(value)
+        })
+    }
+
+    #[wasm_bindgen(js_name = postJsonUrl)]
+    pub fn post_json_url(&self, url: String, payload: JsValue) -> Promise {
+        let client = self.client.clone();
+        future_to_promise(async move {
+            let payload_value = js_to_value(payload)?;
+            let value = client
+                .post_json_value_url(&url, &payload_value)
+                .await
+                .map_err(anyhow_to_js)?;
+            into_js_value(value)
+        })
+    }
 }

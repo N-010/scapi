@@ -134,6 +134,21 @@ impl RpcClient {
         Ok(resp.json::<T>().await?)
     }
 
+    pub async fn get_json_value(&self, path: &str) -> Result<Value> {
+        let url = self.url_for(path);
+        self.get_json_value_url(&url).await
+    }
+
+    pub async fn get_json_value_url(&self, url: &str) -> Result<Value> {
+        let resp = self.http.get(url).send().await?;
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(anyhow!("RPC HTTP error: {} {}", status, body));
+        }
+        Ok(resp.json::<Value>().await?)
+    }
+
     pub async fn post_json<T, P>(&self, path: &str, payload: &P) -> Result<T>
     where
         T: DeserializeOwned,
@@ -147,6 +162,27 @@ impl RpcClient {
             return Err(anyhow!("RPC HTTP error: {} {}", status, body));
         }
         Ok(resp.json::<T>().await?)
+    }
+
+    pub async fn post_json_value<P>(&self, path: &str, payload: &P) -> Result<Value>
+    where
+        P: Serialize + ?Sized,
+    {
+        let url = self.url_for(path);
+        self.post_json_value_url(&url, payload).await
+    }
+
+    pub async fn post_json_value_url<P>(&self, url: &str, payload: &P) -> Result<Value>
+    where
+        P: Serialize + ?Sized,
+    {
+        let resp = self.http.post(url).json(payload).send().await?;
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(anyhow!("RPC HTTP error: {} {}", status, body));
+        }
+        Ok(resp.json::<Value>().await?)
     }
 
     pub async fn post_json_bytes<P>(&self, path: &str, payload: &P) -> Result<Vec<u8>>
