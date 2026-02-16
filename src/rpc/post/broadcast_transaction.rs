@@ -1,8 +1,7 @@
 use anyhow::Result;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine as _;
-use serde::Deserialize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::rpc::RpcClient;
 
@@ -14,7 +13,7 @@ pub struct BroadcastTransactionRequest {
     pub encoded_transaction: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct BroadcastTransactionResponse {
     #[serde(rename = "peersBroadcasted")]
     pub peers_broadcasted: i32,

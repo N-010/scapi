@@ -11,7 +11,7 @@ pub struct GetTickDataRequest {
     pub tick_number: u32,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct TickData {
     #[serde(rename = "tickNumber")]
     pub tick_number: u32,
@@ -30,7 +30,7 @@ pub struct TickData {
     pub signature: String,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct GetTickDataResponse {
     #[serde(rename = "tickData")]
     pub tick_data: Option<TickData>,

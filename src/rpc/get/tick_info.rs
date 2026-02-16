@@ -1,11 +1,11 @@
 use anyhow::Result;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::rpc::RpcClient;
 
 const PATH_TICK_INFO: &str = "tick-info";
 
-#[derive(Debug, Deserialize, Clone, Copy)]
+#[derive(Debug, Deserialize, Serialize, Clone, Copy)]
 pub struct TickInfo {
     pub tick: u32,
     pub duration: u32,
@@ -14,7 +14,7 @@ pub struct TickInfo {
     pub initial_tick: u32,
 }
 
-#[derive(Debug, Deserialize, Clone, Copy)]
+#[derive(Debug, Deserialize, Serialize, Clone, Copy)]
 pub struct TickInfoResponse {
     #[serde(rename = "tickInfo")]
     pub tick_info: TickInfo,

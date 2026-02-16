@@ -1,11 +1,11 @@
 use anyhow::Result;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::rpc::RpcClient;
 
 const PATH_BALANCES: &str = "balances";
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct BalanceInfo {
     pub id: String,
     pub balance: String,
@@ -17,7 +17,7 @@ pub struct BalanceInfo {
     pub latest_outgoing_transfer_tick: u64,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct BalanceResponse {
     pub balance: BalanceInfo,
 }
