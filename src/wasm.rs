@@ -34,6 +34,10 @@ fn js_to_value(value: JsValue) -> Result<Value, JsValue> {
     serde_wasm_bindgen::from_value(value).map_err(|err| JsValue::from_str(&err.to_string()))
 }
 
+fn js_to_typed<T: serde::de::DeserializeOwned>(value: JsValue) -> Result<T, JsValue> {
+    serde_wasm_bindgen::from_value(value).map_err(|err| JsValue::from_str(&err.to_string()))
+}
+
 fn params_to_js(params: Vec<Value>) -> JsValue {
     into_js_value(params).unwrap_or_else(|_| js_sys::Array::new().into())
 }
@@ -461,6 +465,68 @@ pub fn get_balance_async(identity: String) -> Promise {
 pub fn get_tick_data_async(tick: u32) -> Promise {
     future_to_promise(async move {
         let value = crate::rpc::get::get_tick_data(tick)
+            .await
+            .map_err(anyhow_to_js)?;
+        into_js_value(value)
+    })
+}
+
+#[wasm_bindgen(js_name = getComputorListsForEpoch)]
+pub fn get_computor_lists_for_epoch_async(epoch: u32) -> Promise {
+    future_to_promise(async move {
+        let value = crate::rpc::get::get_computor_lists_for_epoch(epoch)
+            .await
+            .map_err(anyhow_to_js)?;
+        into_js_value(value)
+    })
+}
+
+#[wasm_bindgen(js_name = getLastProcessedTick)]
+pub fn get_last_processed_tick_async() -> Promise {
+    future_to_promise(async move {
+        let value = crate::rpc::get::get_last_processed_tick()
+            .await
+            .map_err(anyhow_to_js)?;
+        into_js_value(value)
+    })
+}
+
+#[wasm_bindgen(js_name = getProcessedTickIntervals)]
+pub fn get_processed_tick_intervals_async() -> Promise {
+    future_to_promise(async move {
+        let value = crate::rpc::get::get_processed_tick_intervals()
+            .await
+            .map_err(anyhow_to_js)?;
+        into_js_value(value)
+    })
+}
+
+#[wasm_bindgen(js_name = getTransactionByHash)]
+pub fn get_transaction_by_hash_async(hash: String) -> Promise {
+    future_to_promise(async move {
+        let value = crate::rpc::get::get_transaction_by_hash(&hash)
+            .await
+            .map_err(anyhow_to_js)?;
+        into_js_value(value)
+    })
+}
+
+#[wasm_bindgen(js_name = getTransactionsForIdentity)]
+pub fn get_transactions_for_identity_async(request: JsValue) -> Promise {
+    future_to_promise(async move {
+        let request: crate::rpc::get::GetTransactionsForIdentityRequest = js_to_typed(request)?;
+        let value = crate::rpc::get::get_transactions_for_identity(&request)
+            .await
+            .map_err(anyhow_to_js)?;
+        into_js_value(value)
+    })
+}
+
+#[wasm_bindgen(js_name = getTransactionsForTick)]
+pub fn get_transactions_for_tick_async(request: JsValue) -> Promise {
+    future_to_promise(async move {
+        let request: crate::rpc::get::GetTransactionsForTickRequest = js_to_typed(request)?;
+        let value = crate::rpc::get::get_transactions_for_tick(&request)
             .await
             .map_err(anyhow_to_js)?;
         into_js_value(value)
