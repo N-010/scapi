@@ -4,8 +4,8 @@
 /// Input type: 1
 /// Payload: struct buyTicket_input { uint64 ticketCount; }
 use scapi::{
-    build_ticket_tx_bytes_from_seed, rpc::get::get_tick_info,
-    rpc::post::broadcast_transaction_bytes, PayloadBuilder, QubicId,
+    build_ticket_tx_bytes_from_seed, openapi_models::live::BroadcastTransactionRequest,
+    PayloadBuilder, QubicClient, QubicId,
 };
 use std::io::{self, Write};
 
@@ -36,7 +36,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         &format!("Scheduled tick offset [default {}]: ", DEFAULT_TICK_OFFSET),
         DEFAULT_TICK_OFFSET,
     )?;
-    let current_tick = get_tick_info().await?.tick_info.tick;
+    let client = QubicClient::new();
+    let current_tick = client
+        .live()
+        .get_tick_info()
+        .await?
+        .tick_info
+        .and_then(|info| info.tick)
+        .ok_or("tick info missing")?;
     let tick = current_tick.saturating_add(scheduled_offset);
 
     let input = BuyTicketInput { ticket_count };
@@ -62,10 +69,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    let response = broadcast_transaction_bytes(&tx_bytes).await?;
-    println!("Broadcasted peers: {}", response.peers_broadcasted);
-    println!("Transaction id: {}", response.transaction_id);
-    println!("Encoded tx: {}", response.encoded_transaction);
+    let response = client
+        .live()
+        .broadcast_transaction(&BroadcastTransactionRequest {
+            encoded_transaction: Some(base64::Engine::encode(
+                &base64::engine::general_purpose::STANDARD,
+                &tx_bytes,
+            )),
+        })
+        .await?;
+    println!("Broadcasted peers: {:?}", response.peers_broadcasted);
+    println!("Transaction id: {:?}", response.transaction_id);
+    println!("Encoded tx: {:?}", response.encoded_transaction);
 
     Ok(())
 }

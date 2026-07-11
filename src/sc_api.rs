@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use crate::rpc::post;
+use crate::{openapi_models::live::QuerySmartContractRequest, QubicClient};
 use anyhow::{anyhow, Result};
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde_json::Value;
@@ -8,20 +8,56 @@ use serde_json::Value;
 /// Sends raw request bytes to Qubic RPC `querySmartContract` endpoint.
 ///
 /// The bytes are base64-encoded into JSON field `requestData`.
-/// The function tries to decode base64 from `responseData` first, then `data` if present.
-/// If neither base64 field exists, returns the raw JSON bytes of the response.
+/// The function decodes the base64 payload from `responseData`.
+/// An error is returned when the response does not contain `responseData`.
 pub async fn query_smart_contract_with_meta(
     contract_index: u32,
     input_type: u32,
     request_bytes: &[u8],
 ) -> Result<Vec<u8>> {
-    post::query_smart_contract_with_meta(contract_index, input_type, request_bytes).await
+    let request_data = STANDARD.encode(request_bytes);
+    let response = QubicClient::new()
+        .live()
+        .query_smart_contract(&QuerySmartContractRequest {
+            contract_index: Some(contract_index),
+            input_type: Some(input_type),
+            input_size: Some(request_bytes.len() as u32),
+            request_data: Some(request_data),
+        })
+        .await
+        .map_err(|error| anyhow!(error))?;
+    decode_response_data(response.response_data.as_deref())
+}
+
+fn decode_response_data(response_data: Option<&str>) -> Result<Vec<u8>> {
+    let data = response_data
+        .ok_or_else(|| anyhow!("smart contract response is missing `responseData`"))?;
+    STANDARD.decode(data).map_err(|error| anyhow!(error))
 }
 
 /// Backward-compatible helper that sends without metadata.
 /// Note: the API expects contractIndex/inputType/inputSize; this uses zeros which may be rejected.
 pub async fn query_smart_contract(request_bytes: &[u8]) -> Result<Vec<u8>> {
-    post::query_smart_contract(request_bytes).await
+    query_smart_contract_with_meta(0, 0, request_bytes).await
+}
+
+#[cfg(test)]
+mod response_data_tests {
+    use super::decode_response_data;
+
+    #[test]
+    fn decodes_response_data_to_binary_bytes() {
+        assert_eq!(
+            decode_response_data(Some("AAEC/v8=")).unwrap(),
+            [0, 1, 2, 254, 255]
+        );
+    }
+
+    #[test]
+    fn missing_response_data_is_an_error() {
+        let error = decode_response_data(None).unwrap_err();
+        assert!(error.to_string().contains("responseData"));
+    }
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -202,7 +238,7 @@ impl RequestDataBuilder {
 
     pub async fn send(self) -> Result<Vec<u8>> {
         let payload = self.payload.to_bytes();
-        post::query_smart_contract_with_meta(self.contract_index, self.input_type, &payload).await
+        query_smart_contract_with_meta(self.contract_index, self.input_type, &payload).await
     }
 }
 

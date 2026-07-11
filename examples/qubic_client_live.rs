@@ -1,14 +1,15 @@
 use anyhow::Result;
-use scapi::rpc::get::{get_balance, get_tick_info};
+use scapi::QubicClient;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let tick = get_tick_info().await?;
+    let client = QubicClient::new();
+    let tick = client.live().get_tick_info().await?;
     println!("tick-info: {:?}", tick.tick_info);
 
     // Replace with a real identity if needed.
     let identity = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFXIB";
-    let balance = get_balance(identity).await?;
+    let balance = client.live().get_balance(identity.into()).await?;
     println!("balance: {:?}", balance.balance);
 
     Ok(())

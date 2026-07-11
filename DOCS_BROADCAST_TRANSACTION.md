@@ -67,7 +67,7 @@ let tx_bytes = build_ticket_tx_bytes_from_seed("...", to, 1_000_000, 12345, 1, p
 ### Broadcast
 
 ```rust
-use scapi::rpc::post::broadcast_transaction_bytes;
+use scapi::{openapi_models::live::BroadcastTransactionRequest, QubicClient};
 
 let response = broadcast_transaction_bytes(&tx_bytes).await?;
 println!("Peers: {}", response.peers_broadcasted);
@@ -82,4 +82,4 @@ println!("Tx ID: {}", response.transaction_id);
   - `input_type` = procedure index
   - `payload` = procedure input bytes
 - You can fetch current tick via:
-  - `GET /v1/tick-info` or `scapi::rpc::get::get_tick_info()`
+  - `QubicClient::new().live().get_tick_info()`

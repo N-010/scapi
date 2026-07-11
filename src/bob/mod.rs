@@ -1,22 +1,26 @@
-use crate::rpc::RpcClient;
 use anyhow::Result;
+use reqwest::Client;
 use serde_json::{json, Number, Value};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 pub const DEFAULT_BOB_RPC_ENDPOINT: &str = "http://localhost:40420/qubic";
 
 #[derive(Debug)]
-pub struct BobRpcClient {
+pub struct BobClient {
     endpoint_url: String,
-    rpc: RpcClient,
+    http: Client,
     next_id: AtomicU64,
 }
 
-impl BobRpcClient {
+/// Backward-compatible name for [`BobClient`].
+#[deprecated(note = "renamed to `BobClient`")]
+pub type BobRpcClient = BobClient;
+
+impl BobClient {
     pub fn new(endpoint_url: impl Into<String>) -> Self {
         Self {
             endpoint_url: endpoint_url.into(),
-            rpc: RpcClient::new(),
+            http: Client::new(),
             next_id: AtomicU64::new(1),
         }
     }
@@ -43,9 +47,21 @@ impl BobRpcClient {
             "params": params,
             "id": id
         });
-        self.rpc
-            .post_json_value_url(&self.endpoint_url, &payload)
-            .await
+        let response = self
+            .http
+            .post(&self.endpoint_url)
+            .json(&payload)
+            .send()
+            .await?;
+        let status = response.status();
+        let body = response.bytes().await?;
+        if !status.is_success() {
+            anyhow::bail!(
+                "Bob JSON-RPC HTTP {status}: {}",
+                String::from_utf8_lossy(&body)
+            );
+        }
+        Ok(serde_json::from_slice(&body)?)
     }
 
     pub async fn qubic_chain_id(&self) -> Result<Value> {
@@ -233,5 +249,45 @@ impl BobRpcClient {
             Value::Array(vec![Value::String(subscription_id.into())]),
         )
         .await
+    }
+}
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod tests {
+    use super::*;
+    use std::{
+        io::{Read, Write},
+        net::TcpListener,
+        thread,
+    };
+
+    #[tokio::test]
+    async fn sends_an_independent_json_rpc_request() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let endpoint = format!("http://{}", listener.local_addr().unwrap());
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut bytes = [0; 4096];
+            let size = stream.read(&mut bytes).unwrap();
+            let request = String::from_utf8_lossy(&bytes[..size]);
+            assert!(request.contains("\"method\":\"qubic_chainId\""));
+            assert!(request.contains("\"jsonrpc\":\"2.0\""));
+            let body = r#"{"jsonrpc":"2.0","id":1,"result":"mainnet"}"#;
+            write!(stream, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}", body.len(), body).unwrap();
+        });
+        let response = BobClient::new(endpoint).qubic_chain_id().await.unwrap();
+        assert_eq!(response["result"], "mainnet");
+        server.join().unwrap();
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn legacy_client_alias_exposes_constructor_and_methods() {
+        let module_client = BobRpcClient::new(DEFAULT_BOB_RPC_ENDPOINT);
+        assert_eq!(module_client.endpoint_url(), DEFAULT_BOB_RPC_ENDPOINT);
+
+        let root_client = crate::BobRpcClient::new(DEFAULT_BOB_RPC_ENDPOINT);
+        let method_call = root_client.qubic_chain_id();
+        drop(method_call);
     }
 }

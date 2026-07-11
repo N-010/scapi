@@ -1,391 +1,221 @@
-# SCAPI - Smart Contract API for Qubic
+# SCAPI
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
-[![WebAssembly](https://img.shields.io/badge/WebAssembly-Ready-blue.svg)](https://webassembly.org/)
+SCAPI is a Rust library for Qubic applications. Its primary interface is an instance-based, typed `QubicClient` generated from the Live, Query, Archive, and Stats OpenAPI specifications. The crate also provides an independent Bob JSON-RPC client, helpers for encoding and decoding smart-contract data, transaction support, and WebAssembly bindings.
 
-> 🦀 Rust library for interacting with Qubic smart contracts via HTTP RPC API and WASM
+## Features
 
-## 📚 Documentation
+- One typed `QubicClient` with separate `live()`, `query()`, `archive()`, and `stats()` service accessors
+- 117 generated request and response models and 50 typed OpenAPI operations
+- Per-client endpoint configuration through `QubicClientConfig`
+- Independent `BobClient` for Bob JSON-RPC nodes
+- Smart-contract payload construction with `RequestDataBuilder`
+- Binary response parsing with `ResponseDecoder`
+- Transaction construction, signing, and broadcasting
+- Browser-ready WASM bindings for the client and contract helpers
 
-> 📖 **[Complete Documentation Index](DOCS_INDEX.md)** - Navigate all documents
+## Project structure
 
-- **[Quick Start Guide](QUICKSTART.md)** - Get started in 5 minutes
-- **[Examples](EXAMPLES.md)** - Practical usage examples
-- **[Architecture](ARCHITECTURE.md)** - Architecture and internals
-- **[Testing Guide](TESTING.md)** - Testing guidelines
-- **[Contributing](CONTRIBUTING.md)** - How to contribute
-- **[Changelog](CHANGELOG.md)** - Version history
+- `src/client.rs` and `src/client/openapi_api.rs` — service-oriented HTTP client and typed operations
+- `src/openapi_models.rs` — generated models grouped under `live`, `query`, `archive`, and `stats`
+- `src/bob/` — independent Bob JSON-RPC client
+- `src/sc_api.rs` — contract request and response helpers
+- `src/transaction.rs` and `src/qubic_transactions.rs` — transaction primitives and builders
+- `src/wasm.rs` — WebAssembly bindings
+- `examples/` — runnable Rust examples
 
-## 📋 Description
+## Installation
 
-SCAPI (Smart Contract API) is a Rust library providing a convenient interface for:
-- 🔍 Executing view queries to Qubic smart contracts
-- 📦 Encoding input parameters for contract function calls
-- 🔓 Decoding contract responses using a fluent API
-- 🌐 Browser usage via WebAssembly (WASM)
-- 💻 Command-line interface (CLI)
-
-## ✨ Features
-
-### RequestDataBuilder
-Fluent API for building contract queries:
-```rust
-let response = RequestDataBuilder::new()
-    .set_contract_index(16)
-    .set_input_type(1)
-    .add_uint64(1000)
-    .send()
-    .await?;
-```
-
-### ResponseDecoder
-Declarative contract response decoding:
-```rust
-let result = ResponseDecoder::new(&response_bytes)
-    .u8("teamFeePercent")
-    .u8("distributionFeePercent")
-    .u64("playerCounter")
-    .array_m256i("players", 1024)
-    .to_value();
-```
-
-### WASM Support
-Full JavaScript/TypeScript integration:
-```javascript
-import init, { RequestDataBuilder, ResponseDecoder } from './scapi.js';
-
-await init();
-
-const response = await new RequestDataBuilder()
-    .set_contract_index(16)
-    .set_input_type(2)
-    .send();
-
-const decoded = new ResponseDecoder(response)
-    .u64("balance")
-    .to_value();
-
-console.log(decoded.balance);
-```
-
-## 🚀 Installation
-
-### As Rust Library
+Add the crate from a local checkout:
 
 ```toml
 [dependencies]
-scapi = { git = "https://github.com/your-repo/scapi" }
+scapi = { path = "../SCAPI" }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
-### Build WASM Module
+## Rust quickstart
 
-```bash
-# Install wasm-pack
-cargo install wasm-pack
-
-# Build WASM module
-wasm-pack build --target web --out-dir pkg
-
-# Files will be in pkg/ directory
-```
-
-## 📖 Usage
-
-### CLI (Command Line)
-
-```bash
-# Run CLI
-cargo run --bin scapi-cli
-
-# Or after installation
-scapi-cli
-```
-
-### Rust Library
+Each accessor uses its own default service URL and returns typed generated models:
 
 ```rust
-use scapi::{RequestDataBuilder, ResponseDecoder};
+use anyhow::Result;
+use scapi::QubicClient;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Build and send request
-    let response = RequestDataBuilder::new()
-        .set_contract_index(16)
-        .set_input_type(2)
-        .send()
-        .await?;
-    
-    // Decode response
-    let result = ResponseDecoder::new(&response)
-        .u8("returnCode")
-        .u64("balance")
-        .to_value();
-    
-    println!("{}", result);
+async fn main() -> Result<()> {
+    let client = QubicClient::new();
+
+    let tick = client.live().get_tick_info().await?;
+    let processed = client.query().get_last_processed_tick().await?;
+    let archived = client.archive().get_latest_tick().await?;
+    let stats = client.stats().get_latest_data().await?;
+
+    println!("{tick:?}\n{processed:?}\n{archived:?}\n{stats:?}");
     Ok(())
 }
 ```
 
-### WASM in JavaScript
-
-```javascript
-// Initialize module
-import init, { RequestDataBuilder, ResponseDecoder } from './pkg/scapi.js';
-
-await init('./pkg/scapi_bg.wasm');
-
-// Query contract
-const responseBytes = await new RequestDataBuilder()
-    .set_contract_index(16)
-    .set_input_type(1) // GetFees
-    .send();
-
-// Decode response
-const fees = new ResponseDecoder(responseBytes)
-    .u8("teamFeePercent")
-    .u8("distributionFeePercent")
-    .u8("winnerFeePercent")
-    .u8("burnPercent")
-    .to_value();
-
-console.log('Fees:', fees);
-```
-
-## 🔧 API Reference
-
-### RequestDataBuilder
-
-Methods for building requests:
-
-| Method | Description |
-|-------|----------|
-| `new()` | Create new builder |
-| `set_contract_index(u32)` | Set contract index |
-| `set_input_type(u32)` | Set input type (function) |
-| `with_endianness(bool)` | Set byte order (true = Little Endian) |
-| `add_bool(bool)` | Add boolean value |
-| `add_uint8(u8)` | Add unsigned 8-bit number |
-| `add_uint16(u16)` | Add unsigned 16-bit number |
-| `add_uint32(u32)` | Add unsigned 32-bit number |
-| `add_uint64(u64)` | Add unsigned 64-bit number |
-| `add_int8(i8)` | Add signed 8-bit number |
-| `add_int16(i16)` | Add signed 16-bit number |
-| `add_int32(i32)` | Add signed 32-bit number |
-| `add_int64(i64)` | Add signed 64-bit number |
-| `add_float(f32)` | Add 32-bit float |
-| `add_double(f64)` | Add 64-bit float |
-| `add_bytes(Vec<u8>)` | Add byte array |
-| `add_m256i_bytes([u8; 32])` | Add 256-bit value (ID) |
-| `to_bytes()` | Get encoded bytes |
-| `to_base64()` | Get base64 string |
-| `send()` | Send request and get response |
-
-### ResponseDecoder
-
-Methods for decoding responses:
-
-| Method | Description |
-|-------|----------|
-| `new(&[u8])` | Create new decoder |
-| `with_endianness(Endianness)` | Set byte order |
-| `u8(field)` | Read unsigned 8-bit number |
-| `u16(field)` | Read unsigned 16-bit number |
-| `u32(field)` | Read unsigned 32-bit number |
-| `u64(field)` | Read unsigned 64-bit number |
-| `i8(field)` | Read signed 8-bit number |
-| `i16(field)` | Read signed 16-bit number |
-| `i32(field)` | Read signed 32-bit number |
-| `i64(field)` | Read signed 64-bit number |
-| `f32(field)` | Read 32-bit float |
-| `f64(field)` | Read 64-bit float |
-| `bytes(field, len)` | Read byte array |
-| `m256i(field)` | Read 256-bit value (ID) |
-| `array_u8(field, count)` | Read u8 array |
-| `array_u16(field, count)` | Read u16 array |
-| `array_u32(field, count)` | Read u32 array |
-| `array_u64(field, count)` | Read u64 array |
-| `array_m256i(field, count)` | Read ID array (256-bit) |
-| `array_struct_bytes(field, count, size)` | Read array of structs as bytes |
-| `remaining_bytes(field)` | Read all remaining bytes |
-| `to_value()` | Convert to JSON Value |
-| `to_json_string()` | Convert to JSON string |
-
-## 📝 Examples
-
-### Example 1: Get Contract Balance
+Endpoint overrides belong to a client instance; they do not change global state:
 
 ```rust
-let response = RequestDataBuilder::new()
-    .set_contract_index(16)
-    .set_input_type(10) // GetBalance
-    .send()
-    .await?;
+use scapi::{QubicClient, QubicClientConfig};
 
-let balance = ResponseDecoder::new(&response)
-    .u64("balance")
-    .to_value();
+let config = QubicClientConfig::default()
+    .live_url("https://example.net/live/v1")
+    .query_url("https://example.net/query/v1")
+    .archive_url("https://example.net")
+    .stats_url("https://example.net");
 
-println!("Contract balance: {} QU", balance["balance"]);
+let client = QubicClient::with_config(config);
 ```
 
-### Example 2: Get Player List
+Generated models are available below `scapi::openapi_models::{live, query, archive, stats}`. The typed methods are defined on the corresponding service accessor, so request parameters and response shapes are checked by Rust.
+
+## Smart-contract queries
+
+Use a generated request model when working directly with the Live API:
 
 ```rust
-let response = RequestDataBuilder::new()
-    .set_contract_index(16)
-    .set_input_type(2) // GetPlayers
-    .send()
-    .await?;
+use anyhow::Result;
+use scapi::{openapi_models::live::QuerySmartContractRequest, QubicClient};
 
-let result = ResponseDecoder::new(&response)
-    .array_m256i("players", 1024)
-    .u64("playerCounter")
-    .to_value();
+#[tokio::main]
+async fn main() -> Result<()> {
+    let request = QuerySmartContractRequest {
+        contract_index: Some(16),
+        input_type: Some(6),
+        input_size: Some(0),
+        request_data: Some(String::new()),
+    };
 
-let player_count = result["playerCounter"].as_u64().unwrap();
-println!("Total players: {}", player_count);
-```
-
-### Example 3: Decode Array of Structs
-
-```rust
-let response = RequestDataBuilder::new()
-    .set_contract_index(16)
-    .set_input_type(3) // GetWinners
-    .send()
-    .await?;
-
-let result = ResponseDecoder::new(&response)
-    .array_struct_bytes("winners", 1024, 48) // 48 bytes per struct
-    .u64("winnersCounter")
-    .to_value();
-
-// Decode each winner separately
-for winner_bytes in result["winners"].as_array().unwrap() {
-    let winner = ResponseDecoder::new(winner_bytes.as_bytes())
-        .bytes("winnerAddress", 32)
-        .u64("revenue")
-        .u16("epoch")
-        .u32("tick")
-        .to_value();
-    
-    println!("Winner: {:?}", winner);
+    let response = QubicClient::new()
+        .live()
+        .query_smart_contract(&request)
+        .await?;
+    println!("{response:?}");
+    Ok(())
 }
 ```
 
-### Example 4: JavaScript Integration
+For binary contract layouts, `RequestDataBuilder` appends typed values with configurable endianness and can send the completed payload. `ResponseDecoder` reads named primitive fields, arrays, byte ranges, and 256-bit values from the returned bytes:
+
+```rust
+use anyhow::Result;
+use scapi::{RequestDataBuilder, ResponseDecoder};
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let bytes = RequestDataBuilder::new()
+        .set_contract_index(16)
+        .set_input_type(6)
+        .send()
+        .await?;
+
+    let value = ResponseDecoder::new(&bytes)
+        .u8("currentState")?
+        .to_value();
+    println!("{value}");
+    Ok(())
+}
+```
+
+## Broadcasting a transaction
+
+The Live OpenAPI service accepts a base64-encoded signed transaction through its typed request model:
+
+```rust
+use anyhow::Result;
+use scapi::{openapi_models::live::BroadcastTransactionRequest, QubicClient};
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let signed_transaction_base64 = "...".to_owned();
+    let request = BroadcastTransactionRequest {
+        encoded_transaction: Some(signed_transaction_base64),
+    };
+
+    let response = QubicClient::new()
+        .live()
+        .broadcast_transaction(&request)
+        .await?;
+    println!("transaction: {:?}", response.transaction_id);
+    Ok(())
+}
+```
+
+## Bob JSON-RPC
+
+Bob is a separate protocol and is not one of the four OpenAPI services. Connect to it explicitly with `BobClient`; `with_base_url` appends the `/qubic` RPC path.
+
+```rust
+use anyhow::Result;
+use scapi::bob::BobClient;
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let bob = BobClient::with_base_url("http://localhost:40420");
+    let status = bob.qubic_status().await?;
+    let result = bob.qubic_broadcast_transaction("0x...signed_tx_hex...").await?;
+    println!("status: {status}\nbroadcast: {result}");
+    Ok(())
+}
+```
+
+`BobClient::call` is also available for methods that do not yet have a convenience wrapper.
+
+## WebAssembly
+
+Install the Rust target and build the package with `wasm-pack`:
+
+```text
+rustup target add wasm32-unknown-unknown
+wasm-pack build --target web
+```
+
+The WASM API exposes all OpenAPI operations through the `live`, `query`, `archive`, and `stats` service objects, as well as `RequestDataBuilder`, `ResponseDecoder`, and asynchronous smart-contract helpers:
 
 ```javascript
-// Initialize
-import init, { RequestDataBuilder, ResponseDecoder } from './scapi.js';
+import init, { QubicClientConfig, QubicClient } from "./pkg/scapi.js";
+
 await init();
 
-// Get fees
-async function getFees() {
-    const response = await new RequestDataBuilder()
-        .set_contract_index(16)
-        .set_input_type(1)
-        .send();
-    
-    const fees = new ResponseDecoder(response)
-        .u8("teamFeePercent")
-        .u8("distributionFeePercent")
-        .u8("winnerFeePercent")
-        .u8("burnPercent")
-        .to_value();
-    
-    return fees;
-}
-
-// Usage
-const fees = await getFees();
-console.log('Team fee:', fees.teamFeePercent, '%');
-console.log('Winner fee:', fees.winnerFeePercent, '%');
+const config = new QubicClientConfig(
+  "https://rpc.qubic.org/live/v1",
+  undefined,
+  undefined,
+  undefined,
+);
+const client = new QubicClient(config);
+const tickInfo = await client.live.getTickInfo();
+const balance = await client.live.getBalance("IDENTITY");
+const archivedTick = await client.archive.getTickData(123456);
+const latestStats = await client.stats.getLatestData();
+const contractResult = await client.live.querySmartContract({
+  contractIndex: 1,
+  inputType: 2,
+  inputSize: 0,
+  requestData: "",
+});
 ```
 
-## 🔨 Development
+Method names are the camel-case form of the Rust OpenAPI methods. Path parameters are positional strings or numbers. Request bodies and grouped query parameters are plain JSON-compatible JavaScript objects; when both are present, arguments follow the Rust order: path, body, query. Every operation returns a `Promise` resolving to a JSON-compatible object and rejects with a textual error for HTTP, deserialization, or serialization failures.
 
-### Requirements
+## Building and examples
 
-- Rust 1.70+
-- wasm-pack (for WASM builds)
-- Node.js 16+ (for WASM testing)
-
-### Build Project
-
-```bash
-# Regular build
+```text
 cargo build
-
-# Release build
-cargo build --release
-
-# Build WASM
-wasm-pack build --target web --out-dir pkg
-
-# Run tests
 cargo test
+cargo run --example qubic_client_live
+cargo run --example qubic_client_query_smart_contract
+cargo run --example bob_qubic_status
 ```
 
-### Project Structure
+See the [`examples`](examples/) directory for OpenAPI, Bob, contract, transaction, and WalletConnect programs.
 
-```
-SCAPI/
-├── src/
-│   ├── lib.rs          # Main module
-│   ├── main.rs         # CLI application
-│   ├── sc_api.rs       # Core API logic
-│   └── wasm.rs         # WASM bindings
-├── pkg/                # WASM output (after build)
-│   ├── scapi.js
-│   ├── scapi_bg.wasm
-│   └── scapi.d.ts
-├── Cargo.toml          # Project configuration
-└── README.md           # Documentation
-```
+## Contributing
 
-## 🌐 RPC Configuration
+Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md), keep generated interfaces and examples consistent, and run the Rust checks before opening a change.
 
-By default, SCAPI uses `https://rpc.qubic.org` as the RPC endpoint.
+## License
 
-To change the endpoint (in future versions):
-```rust
-// TODO: add support for custom endpoint
-```
-
-## 🐛 Known Limitations
-
-1. **Endianness**: Little Endian by default (Qubic standard)
-2. **WASM size**: ~200KB after optimization
-3. **Browser compatibility**: Modern browsers with WASM support
-
-## 🤝 Contributing
-
-Pull requests are welcome! For major changes, please open an issue first.
-
-### TODO
-- [ ] Add support for custom RPC endpoints
-- [ ] Add more examples
-- [ ] Improve error handling
-- [ ] Add transaction support (not just view calls)
-- [ ] Optimize WASM bundle size
-
-## 📄 License
-
-MIT License - see LICENSE file for details
-
-## 🔗 Links
-
-- [Qubic Official Website](https://qubic.org)
-- [Qubic RPC Documentation](https://docs.qubic.org)
-- [WebAssembly](https://webassembly.org/)
-- [wasm-pack](https://rustwasm.github.io/wasm-pack/)
-
-## 📧 Contact
-
-For questions and suggestions, open an issue in the repository.
-
----
-
-Made with ❤️ for Qubic ecosystem
+Licensed under the [MIT License](LICENSE).

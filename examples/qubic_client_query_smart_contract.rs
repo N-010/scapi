@@ -1,5 +1,5 @@
 use anyhow::Result;
-use scapi::rpc::post::query_smart_contract_with_meta;
+use scapi::query_smart_contract_with_meta;
 
 #[tokio::main]
 async fn main() -> Result<()> {
