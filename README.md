@@ -1,5 +1,17 @@
 # SCAPI - Smart Contract API for Qubic
 
+## Cargo features
+
+Native WalletConnect support and `scapi-cli` require the `wallet-connect`
+feature, which is enabled by default. Applications using only Qubic signing,
+transactions, RPC, or Bob can exclude WalletConnect dependencies:
+
+```toml
+scapi = { git = "https://github.com/N-010/scapi", default-features = false }
+```
+
+The default build retains the existing WalletConnect API and CLI behavior.
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
 [![WebAssembly](https://img.shields.io/badge/WebAssembly-Ready-blue.svg)](https://webassembly.org/)

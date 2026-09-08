@@ -5,7 +5,7 @@ pub mod qubic_types;
 pub mod rpc;
 pub mod sc_api;
 pub mod transaction;
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(all(not(target_arch = "wasm32"), feature = "wallet-connect"))]
 pub mod wallet_connect;
 
 #[cfg(target_arch = "wasm32")]
@@ -20,7 +20,7 @@ pub use crate::rpc::{
 };
 pub use crate::sc_api::*;
 pub use crate::transaction::*;
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(all(not(target_arch = "wasm32"), feature = "wallet-connect"))]
 pub use crate::wallet_connect::*;
 
 #[cfg(target_arch = "wasm32")]

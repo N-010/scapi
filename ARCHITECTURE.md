@@ -2,6 +2,15 @@
 
 Detailed architecture documentation for SCAPI project.
 
+## Optional WalletConnect integration
+
+The `wallet-connect` Cargo feature enables the native WalletConnect module,
+its re-exports, the `walletconnect-sdk` dependency, and the `scapi-cli` binary.
+It is enabled by default to preserve existing consumers. Applications that only
+need Qubic wallet signing, transaction codecs, RPC, or Bob can disable default
+features to exclude WalletConnect and its independent HTTP/Ethereum dependency
+graph. These Qubic APIs and their protocol behavior remain unchanged.
+
 ## 📐 Project Structure
 
 ```
